@@ -1,118 +1,54 @@
-:root {
-  --bg: #07090c;
-  --card: #0d1117;
-  --line: #1f2733;
-  --text: #e6edf3;
-  --muted: #8b98a8;
-  --neon: #19f0d2;
-}
-
-* {
-  box-sizing: border-box;
-}
-
+/* 명세 ② 예시: 청록과 흰색 · 제목은 크게 · 휴대폰에서 누르기 쉬운 버튼 · 줄 사이 넉넉하게 */
 body {
-  margin: 0 auto;
-  padding: 24px 16px 48px;
   max-width: 480px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-  line-height: 1.5;
+  margin: 0 auto;
+  padding: 24px 16px;
+  font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  background: #ffffff;
+  color: #1f2937;
+  line-height: 1.6;
 }
 
-h1 {
-  margin: 0 0 20px;
-  padding: 20px 16px;
-  font-size: 1.75rem;
-  font-weight: 700;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
+h1 { font-size: 28px; color: #0f766e; }
 
-label {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--muted);
-  font-size: 0.875rem;
-}
-
-input[type="text"] {
+#item {
   width: 100%;
-  padding: 12px 14px;
-  font: inherit;
-  color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--line);
+  box-sizing: border-box;
+  padding: 12px;
+  margin-bottom: 8px;
+  font-size: 16px;
+  border: 1px solid #99c9c4;
   border-radius: 8px;
 }
 
-input[type="text"]::placeholder {
-  color: var(--muted);
-}
+button { padding: 12px 20px; border-radius: 8px; }
 
-input[type="text"]:focus {
-  outline: none;
-  border-color: var(--neon);
-  box-shadow: 0 0 8px rgba(25, 240, 210, 0.45);
-}
-
-button {
-  display: block;
+#add {
   width: 100%;
-  margin-top: 10px;
-  padding: 12px 14px;
-  font: inherit;
-  font-weight: 700;
-  color: var(--bg);
-  background: var(--neon);
-  border: 1px solid var(--neon);
-  border-radius: 8px;
-  cursor: pointer;
-  box-shadow: 0 0 14px rgba(25, 240, 210, 0.5);
+  font-size: 16px;
+  color: #ffffff;
+  background: #0f766e;
+  border: none;
 }
 
-button:hover {
-  background: #5ff5df;
-  border-color: #5ff5df;
+#list { list-style: none; padding: 0; }
+
+#list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-button:active {
-  opacity: 0.85;
+#list li button {
+  margin-left: auto;
+  padding: 8px 12px;
+  color: #0f766e;
+  background: #ffffff;
+  border: 1px solid #0f766e;
 }
 
-ul {
-  margin: 24px 0 0;
-  padding: 0;
-  list-style: none;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
+#list input[type="checkbox"] { width: 22px; height: 22px; }
 
-li {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-li:last-child {
-  border-bottom: none;
-}
-
-#remaining {
-  margin: 16px 0 0;
-  padding: 14px 16px;
-  color: var(--muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-
-@media (max-width: 600px) {
-  button {
-    padding: 18px 14px;
-    font-size: 1.25rem;
-  }
-}
+li.done { text-decoration: line-through; color: #9ca3af; }
