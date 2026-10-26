@@ -1,10 +1,10 @@
 :root {
-  --bg: #0c0a04;
-  --card: #14110a;
-  --line: #332c14;
-  --text: #fff6d6;
-  --muted: #b5a672;
-  --neon: #ffd400;
+  --bg: #07090c;
+  --card: #0d1117;
+  --line: #1f2733;
+  --text: #e6edf3;
+  --muted: #8b98a8;
+  --neon: #19f0d2;
 }
 
 * {
@@ -55,7 +55,7 @@ input[type="text"]::placeholder {
 input[type="text"]:focus {
   outline: none;
   border-color: var(--neon);
-  box-shadow: 0 0 8px rgba(255, 212, 0, 0.45);
+  box-shadow: 0 0 8px rgba(25, 240, 210, 0.45);
 }
 
 button {
@@ -70,7 +70,7 @@ button {
   border: 1px solid var(--neon);
   border-radius: 8px;
   cursor: pointer;
-  box-shadow: 0 0 14px rgba(255, 212, 0, 0.5);
+  box-shadow: 0 0 14px rgba(25, 240, 210, 0.5);
 }
 
 button:active {
