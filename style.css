@@ -21,6 +21,18 @@ h1 { font-size: 28px; color: #0f766e; }
   border-radius: 8px;
 }
 
+#category {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  margin-bottom: 8px;
+  font-size: 16px;
+  color: #1f2937;
+  background: #ffffff;
+  border: 1px solid #99c9c4;
+  border-radius: 8px;
+}
+
 button { padding: 12px 20px; border-radius: 8px; }
 
 #add {
@@ -50,5 +62,14 @@ button { padding: 12px 20px; border-radius: 8px; }
 }
 
 #list input[type="checkbox"] { width: 22px; height: 22px; }
+
+.tag {
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #0f766e;
+  background: #e6f4f2;
+  border-radius: 999px;
+  white-space: nowrap;
+}
 
 li.done { text-decoration: line-through; color: #9ca3af; }
