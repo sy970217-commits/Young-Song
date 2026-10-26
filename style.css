@@ -104,3 +104,10 @@ li:last-child {
   border: 1px solid var(--line);
   border-radius: 8px;
 }
+
+@media (max-width: 600px) {
+  button {
+    padding: 18px 14px;
+    font-size: 1.25rem;
+  }
+}
