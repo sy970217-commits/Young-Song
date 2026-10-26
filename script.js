@@ -1,8 +1,36 @@
 // 명세 ③: 추가 → 목록 맨 아래에 · 체크 → 줄이 그어지고 남은 개수 −1 · 삭제 → 목록에서 사라짐
 // 완료 조건: 빈 칸은 추가 안 됨 · 체크하면 남은 개수가 바로 바뀜 · 새로고침해도 남음 · 휴대폰에서 쓸 수 있음
 
-const KEY = 'todo-items';  // 이 브라우저 안(로컬 스토리지)에 저장할 이름
-let items = JSON.parse(localStorage.getItem(KEY) || '[]');
+// 할 일 목록은 Supabase의 todos 표에 저장한다 (공개 키만 쓴다)
+const SUPABASE_URL = 'https://sijsxqhlaxtlmxdkmhuk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_9pOuskQ0vs7Cd5yTa5iM1g_FDr6FK3h';
+
+let items = [];  // 표에서 읽어 온 줄들 (분류·마감일·별표는 표에 칸이 없어서 이 화면에만 있다)
+
+// todos 표에 요청을 보낸다. 실패하면 오류를 던진다
+async function api(query, options = {}) {
+  const response = await fetch(SUPABASE_URL + '/rest/v1/todos' + query, {
+    ...options,
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json', ...options.headers },
+  });
+  if (!response.ok) throw new Error('Supabase ' + response.status);
+  return response.status === 204 ? null : response.json();
+}
+
+function showError() {
+  alert('표에 저장하지 못했어요. 인터넷 연결을 확인하고 다시 해 보세요.');
+}
+
+// 페이지를 열 때 표에서 목록을 읽어 온다
+async function loadItems() {
+  try {
+    const rows = await api('?select=id,text,done,created_at&order=created_at.asc');
+    items = rows.map((row) => ({ id: row.id, text: row.text, done: row.done }));
+  } catch (error) {
+    showError();
+  }
+  render();
+}
 
 const HIDE_KEY = 'todo-hide-done';  // 완료한 것을 숨기는 중인지 저장할 이름
 let hideDone = localStorage.getItem(HIDE_KEY) === 'true';
@@ -15,13 +43,17 @@ function applyTheme() {
   document.querySelector('#theme').textContent = dark ? '밝은 화면' : '어두운 화면';
 }
 
-function save() {
-  localStorage.setItem(KEY, JSON.stringify(items));
-}
-
-function addItem(text, category, due) {
-  items.push({ text: text, category: category, due: due, done: false });  // 목록 맨 아래에
-  save();
+async function addItem(text, category, due) {
+  try {
+    const rows = await api('', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ text: text, done: false }),
+    });
+    items.push({ id: rows[0].id, text: text, category: category, due: due, done: false });  // 목록 맨 아래에
+  } catch (error) {
+    showError();
+  }
   render();
 }
 
@@ -35,8 +67,8 @@ function today() {
 function render() {
   const list = document.querySelector('#list');
   list.innerHTML = '';
-  // 중요 표시한 것이 맨 위, 그 안에서 마감일 가까운 순 (i는 원래 자리 번호)
-  const order = items.map((item, i) => ({ item, i }));
+  // 중요 표시한 것이 맨 위, 그 안에서 마감일 가까운 순
+  const order = items.map((item) => ({ item }));
   order.sort((a, b) => {
     if (Boolean(a.item.star) !== Boolean(b.item.star)) return Boolean(b.item.star) - Boolean(a.item.star);
     if (a.item.due && b.item.due) return a.item.due < b.item.due ? -1 : a.item.due > b.item.due ? 1 : 0;  // 마감일이 가까운 순
@@ -44,7 +76,7 @@ function render() {
     if (b.item.due) return 1;
     return 0;                   // 마감일이 없는 것끼리는 추가한 순서 그대로
   });
-  order.forEach(({ item, i }) => {
+  order.forEach(({ item }) => {
     if (hideDone && item.done) return;  // 숨기는 중이면 완료한 줄은 만들지 않는다
     const li = document.createElement('li');
     if (item.done) li.classList.add('done');
@@ -52,10 +84,16 @@ function render() {
     const check = document.createElement('input');
     check.type = 'checkbox';
     check.checked = item.done;
-    check.addEventListener('change', () => {
-      items[i].done = check.checked;
-      save();
+    check.addEventListener('change', async () => {
+      item.done = check.checked;
       render();
+      try {
+        await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ done: item.done }) });
+      } catch (error) {
+        item.done = !item.done;  // 저장 실패하면 원래대로
+        showError();
+        render();
+      }
     });
 
     const star = document.createElement('button');
@@ -65,8 +103,7 @@ function render() {
     star.setAttribute('aria-label', '중요 표시');
     star.setAttribute('aria-pressed', item.star ? 'true' : 'false');
     star.addEventListener('click', () => {
-      items[i].star = !items[i].star;
-      save();
+      item.star = !item.star;
       render();
     });
 
@@ -90,9 +127,13 @@ function render() {
     const del = document.createElement('button');
     del.type = 'button';
     del.textContent = '삭제';
-    del.addEventListener('click', () => {
-      items.splice(i, 1);
-      save();
+    del.addEventListener('click', async () => {
+      try {
+        await api('?id=eq.' + item.id, { method: 'DELETE' });
+        items.splice(items.indexOf(item), 1);
+      } catch (error) {
+        showError();
+      }
       render();
     });
 
@@ -136,4 +177,4 @@ document.querySelector('#item').addEventListener('keydown', (event) => {
 });
 
 applyTheme();
-render();
+loadItems();
