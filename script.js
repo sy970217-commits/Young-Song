@@ -27,7 +27,10 @@ function today() {
 function render() {
   const list = document.querySelector('#list');
   list.innerHTML = '';
-  items.forEach((item, i) => {
+  // 중요 표시한 것이 맨 위로. 같은 쪽끼리는 추가한 순서 그대로 (i는 원래 자리 번호)
+  const order = items.map((item, i) => ({ item, i }));
+  order.sort((a, b) => Boolean(b.item.star) - Boolean(a.item.star));
+  order.forEach(({ item, i }) => {
     if (hideDone && item.done) return;  // 숨기는 중이면 완료한 줄은 만들지 않는다
     const li = document.createElement('li');
     if (item.done) li.classList.add('done');
@@ -41,7 +44,20 @@ function render() {
       render();
     });
 
+    const star = document.createElement('button');
+    star.type = 'button';
+    star.className = 'star' + (item.star ? ' on' : '');
+    star.textContent = item.star ? '★' : '☆';
+    star.setAttribute('aria-label', '중요 표시');
+    star.setAttribute('aria-pressed', item.star ? 'true' : 'false');
+    star.addEventListener('click', () => {
+      items[i].star = !items[i].star;
+      save();
+      render();
+    });
+
     const label = document.createElement('span');
+    label.className = 'label';
     label.textContent = item.text;
 
     const tag = document.createElement('span');
@@ -66,7 +82,7 @@ function render() {
       render();
     });
 
-    li.append(check, label, tag);
+    li.append(check, star, label, tag);
     if (item.due) li.append(dueLabel);
     li.append(del);
     list.append(li);

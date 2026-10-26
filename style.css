@@ -73,6 +73,18 @@ button { padding: 12px 20px; border-radius: 8px; }
   border: 1px solid #0f766e;
 }
 
+#list li button.star {
+  margin-left: 0;
+  padding: 0 4px;
+  font-size: 24px;
+  line-height: 1;
+  color: #9ca3af;
+  background: none;
+  border: none;
+}
+
+#list li button.star.on { color: #facc15; }
+
 #list input[type="checkbox"] { width: 22px; height: 22px; flex-shrink: 0; }
 
 .due {
@@ -92,4 +104,5 @@ button { padding: 12px 20px; border-radius: 8px; }
   white-space: nowrap;
 }
 
-li.done { text-decoration: line-through; color: #9ca3af; }
+li.done { color: #9ca3af; }
+li.done .label { text-decoration: line-through; }
