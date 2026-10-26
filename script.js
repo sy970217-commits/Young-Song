@@ -17,6 +17,9 @@ async function api(query, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+const BUCKET = 'attachments';           // 파일을 올리는 Supabase 저장소 이름
+const MAX_FILE_SIZE = 5 * 1024 * 1024;  // 5MB
+
 function showError() {
   alert('표에 저장하지 못했어요. 인터넷 연결을 확인하고 다시 해 보세요.');
 }
@@ -24,8 +27,8 @@ function showError() {
 // 페이지를 열 때 표에서 목록을 읽어 온다
 async function loadItems() {
   try {
-    const rows = await api('?select=id,text,done,created_at&order=created_at.asc');
-    items = rows.map((row) => ({ id: row.id, text: row.text, done: row.done }));
+    const rows = await api('?select=*&order=created_at.asc');  // file_url 칸이 아직 없어도 읽힌다
+    items = rows.map((row) => ({ id: row.id, text: row.text, done: row.done, file_url: row.file_url }));
   } catch (error) {
     showError();
   }
@@ -41,6 +44,43 @@ let dark = localStorage.getItem(THEME_KEY) === 'true';
 function applyTheme() {
   document.body.classList.toggle('dark', dark);
   document.querySelector('#theme').textContent = dark ? '밝은 화면' : '어두운 화면';
+}
+
+// 파일 고르는 창을 여는 보이지 않는 입력칸 (화면에 붙여 둬야 휴대폰에서도 잘 열린다)
+const picker = document.createElement('input');
+picker.type = 'file';
+picker.hidden = true;
+document.body.append(picker);
+let pickingItem = null;  // 지금 파일을 붙이려는 할 일
+picker.addEventListener('change', () => {
+  const file = picker.files[0];
+  picker.value = '';
+  if (file && pickingItem) attachFile(pickingItem, file);
+});
+
+// 파일을 저장소에 올리고, 그 주소를 todos 표의 file_url 칸에 적는다
+async function attachFile(item, file) {
+  if (file.size > MAX_FILE_SIZE) {
+    alert('파일이 너무 커요. 5MB 이하만 올릴 수 있어요.');
+    return;
+  }
+  // 저장소 이름에는 한글을 못 쓰므로 번호와 확장자만 쓰고, 원래 이름은 주소 끝(#)에 붙인다
+  const extension = (file.name.match(/\.[A-Za-z0-9]+$/) || [''])[0];
+  const key = item.id + '-' + Date.now() + extension;
+  try {
+    const upload = await fetch(SUPABASE_URL + '/storage/v1/object/' + BUCKET + '/' + key, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    });
+    if (!upload.ok) throw new Error('Storage ' + upload.status);
+    const fileUrl = SUPABASE_URL + '/storage/v1/object/public/' + BUCKET + '/' + key + '#' + encodeURIComponent(file.name);
+    await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ file_url: fileUrl }) });
+    item.file_url = fileUrl;
+  } catch (error) {
+    showError();
+  }
+  render();
 }
 
 async function addItem(text, category, due) {
@@ -124,6 +164,26 @@ function render() {
       if (item.due < today() && !item.done) dueLabel.classList.add('overdue');
     }
 
+    // 파일이 있으면 이름 링크, 없으면 '파일' 버튼
+    let attach;
+    if (item.file_url) {
+      attach = document.createElement('a');
+      attach.className = 'file-link';
+      attach.href = item.file_url;
+      attach.target = '_blank';
+      attach.rel = 'noopener';
+      attach.textContent = decodeURIComponent(item.file_url.split('#')[1] || '첨부 파일');
+    } else {
+      attach = document.createElement('button');
+      attach.type = 'button';
+      attach.className = 'attach';
+      attach.textContent = '파일';
+      attach.addEventListener('click', () => {
+        pickingItem = item;
+        picker.click();
+      });
+    }
+
     const del = document.createElement('button');
     del.type = 'button';
     del.textContent = '삭제';
@@ -139,7 +199,7 @@ function render() {
 
     li.append(check, star, label, tag);
     if (item.due) li.append(dueLabel);
-    li.append(del);
+    li.append(attach, del);
     list.append(li);
   });
   document.querySelector('#toggle-done').textContent = hideDone ? '완료한 것 보기' : '완료한 것 숨기기';

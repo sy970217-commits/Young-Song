@@ -159,3 +159,21 @@ body.dark li.done { color: #6b7280; }
   margin-bottom: 16px;
   border-radius: 16px;
 }
+
+/* 파일 첨부: '파일' 버튼과 파일 이름 링크 */
+#list li button.attach {
+  margin-left: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.file-link {
+  max-width: 90px;
+  overflow: hidden;
+  font-size: 12px;
+  color: #0f766e;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dark .file-link { color: #2dd4bf; }
