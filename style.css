@@ -57,12 +57,14 @@ button { padding: 12px 20px; border-radius: 8px; }
 #list { list-style: none; padding: 0; }
 
 #list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid #e5e7eb;
+}
+
+#list .row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 #list li button {
@@ -169,7 +171,7 @@ body.dark li.done { color: #6b7280; }
 }
 
 .file-link {
-  max-width: 90px;
+  max-width: 64px;
   overflow: hidden;
   font-size: 12px;
   color: #0f766e;
@@ -177,9 +179,15 @@ body.dark li.done { color: #6b7280; }
   white-space: nowrap;
 }
 
+.thumb-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 8px 0 0 34px;
+}
+
 .thumb {
-  flex-basis: 100%;
-  margin-left: 34px;
+  min-width: 0;
 }
 
 .thumb img {

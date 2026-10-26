@@ -51,10 +51,10 @@ function applyTheme() {
   document.querySelector('#theme').textContent = dark ? '밝은 화면' : '어두운 화면';
 }
 
-// 링크 주소를 todos 표의 link_url 칸에 적는다
+// 링크 주소를 todos 표의 link_url 칸에 적는다 (이미 있으면 수정)
 async function addLink(item) {
-  const address = (prompt('링크 주소를 적어 주세요 (http:// 또는 https://로 시작)') || '').trim();
-  if (address === '') return;
+  const address = (prompt('링크 주소를 적어 주세요 (http:// 또는 https://로 시작)', item.link_url || '') || '').trim();
+  if (address === '' || address === item.link_url) return;
   if (!isWebAddress(address)) {
     alert('http:// 또는 https://로 시작하는 주소만 넣을 수 있어요.');
     return;
@@ -66,6 +66,51 @@ async function addLink(item) {
     showError();
   }
   render();
+}
+
+// 링크를 지운다
+async function removeLink(item) {
+  if (!confirm('링크를 지울까요?')) return;
+  try {
+    await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ link_url: null }) });
+    item.link_url = null;
+  } catch (error) {
+    showError();
+  }
+  render();
+}
+
+// 저장소에 있는 이미지 파일을 지운다 (표에서 주소를 뺀 뒤에 부른다)
+async function deleteStoredImage(imageUrl) {
+  const key = (imageUrl || '').split('/object/public/' + IMAGE_BUCKET + '/')[1];
+  if (!key) return;
+  try {
+    const response = await fetch(SUPABASE_URL + '/storage/v1/object/' + IMAGE_BUCKET, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes: [key] }),
+    });
+    const removed = response.ok ? await response.json() : [];
+    if (removed.length === 0) throw new Error('not removed');
+  } catch (error) {
+    alert('표에서는 지웠지만 저장소의 이미지 파일은 지우지 못했어요. Supabase의 삭제 권한을 확인해 주세요.');
+  }
+}
+
+// 이미지를 지운다
+async function removeImage(item) {
+  if (!confirm('이미지를 지울까요?')) return;
+  const oldUrl = item.image_url;
+  try {
+    await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ image_url: null }) });
+    item.image_url = null;
+  } catch (error) {
+    showError();
+    render();
+    return;
+  }
+  render();
+  await deleteStoredImage(oldUrl);
 }
 
 // 이미지를 저장소에 올리고, 그 주소를 todos 표의 image_url 칸에 적는다
@@ -90,7 +135,11 @@ async function addImage(item, file) {
     if (!upload.ok) throw new Error('Storage ' + upload.status);
     const imageUrl = SUPABASE_URL + '/storage/v1/object/public/' + IMAGE_BUCKET + '/' + key;
     await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ image_url: imageUrl }) });
+    const oldUrl = item.image_url;  // 바꾸는 경우 옛 파일은 저장소에서 지운다
     item.image_url = imageUrl;
+    render();
+    if (oldUrl) await deleteStoredImage(oldUrl);
+    return;
   } catch (error) {
     showError();
   }
@@ -129,6 +178,17 @@ function today() {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   return now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+}
+
+// 줄 안에 쓰는 작은 버튼
+function smallButton(text, label, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'attach';
+  button.textContent = text;
+  button.setAttribute('aria-label', label);
+  button.addEventListener('click', onClick);
+  return button;
 }
 
 function render() {
@@ -193,6 +253,7 @@ function render() {
 
     // 링크가 있으면 주소 링크, 없으면 '링크' 버튼
     let linkPart;
+    let linkEdit = [];
     if (item.link_url && isWebAddress(item.link_url)) {
       linkPart = document.createElement('a');
       linkPart.className = 'file-link';
@@ -204,6 +265,10 @@ function render() {
       } catch (error) {
         linkPart.textContent = '링크';
       }
+      linkEdit = [
+        smallButton('수정', '링크 수정', () => addLink(item)),
+        smallButton('×', '링크 지우기', () => removeLink(item)),
+      ];
     } else {
       linkPart = document.createElement('button');
       linkPart.type = 'button';
@@ -229,23 +294,33 @@ function render() {
     del.type = 'button';
     del.textContent = '삭제';
     del.addEventListener('click', async () => {
+      const imageUrl = item.image_url;
       try {
         await api('?id=eq.' + item.id, { method: 'DELETE' });
         items.splice(items.indexOf(item), 1);
       } catch (error) {
         showError();
+        render();
+        return;
       }
       render();
+      if (imageUrl) await deleteStoredImage(imageUrl);  // 이미지가 있었으면 저장소에서도 지운다
     });
 
-    li.append(check, star, label, tag);
-    if (item.due) li.append(dueLabel);
-    li.append(linkPart);
-    if (imageButton) li.append(imageButton);
-    li.append(del);
+    // 한 줄에 들어가는 것들은 main에 담고, 이미지 미리보기는 그 아래에 둔다
+    const main = document.createElement('div');
+    main.className = 'row-main';
+    main.append(check, star, label, tag);
+    if (item.due) main.append(dueLabel);
+    main.append(linkPart, ...linkEdit);
+    if (imageButton) main.append(imageButton);
+    main.append(del);
+    li.append(main);
 
     // 이미지가 있으면 줄 아래에 작은 미리보기 (누르면 크게 열린다)
     if (item.image_url && isWebAddress(item.image_url)) {
+      const row = document.createElement('div');
+      row.className = 'thumb-row';
       const imageLink = document.createElement('a');
       imageLink.className = 'thumb';
       imageLink.href = item.image_url;
@@ -255,7 +330,15 @@ function render() {
       thumb.src = item.image_url;
       thumb.alt = item.text + ' 이미지';
       imageLink.append(thumb);
-      li.append(imageLink);
+      row.append(
+        imageLink,
+        smallButton('바꾸기', '이미지 바꾸기', () => {
+          pickingItem = item;
+          picker.click();
+        }),
+        smallButton('×', '이미지 지우기', () => removeImage(item))
+      );
+      li.append(row);
     }
     list.append(li);
   });
