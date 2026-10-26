@@ -8,10 +8,17 @@ function save() {
   localStorage.setItem(KEY, JSON.stringify(items));
 }
 
-function addItem(text, category) {
-  items.push({ text: text, category: category, done: false });  // 목록 맨 아래에
+function addItem(text, category, due) {
+  items.push({ text: text, category: category, due: due, done: false });  // 목록 맨 아래에
   save();
   render();
+}
+
+// 오늘 날짜를 '2026-10-26' 모양으로 (이 기기의 시간 기준)
+function today() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
 }
 
 function render() {
@@ -37,6 +44,15 @@ function render() {
     tag.className = 'tag';
     tag.textContent = item.category || '기타';  // 분류가 없던 옛 항목은 기타
 
+    // 마감일이 있으면 보여 주고, 지났는데 체크 안 했으면 붉게 한다
+    const dueLabel = document.createElement('span');
+    if (item.due) {
+      const [, month, day] = item.due.split('-');
+      dueLabel.className = 'due';
+      dueLabel.textContent = '~' + Number(month) + '/' + Number(day);
+      if (item.due < today() && !item.done) dueLabel.classList.add('overdue');
+    }
+
     const del = document.createElement('button');
     del.type = 'button';
     del.textContent = '삭제';
@@ -46,7 +62,9 @@ function render() {
       render();
     });
 
-    li.append(check, label, tag, del);
+    li.append(check, label, tag);
+    if (item.due) li.append(dueLabel);
+    li.append(del);
     list.append(li);
   });
   // 남은 개수 = 체크하지 않은 것
@@ -58,7 +76,9 @@ button.addEventListener('click', () => {
   const input = document.querySelector('#item');
   const text = input.value.trim();
   if (text === '') return;   // 빈 칸이면 멈춘다
-  addItem(text, document.querySelector('#category').value);  // 고른 분류와 함께 추가한다
+  const due = document.querySelector('#due');
+  addItem(text, document.querySelector('#category').value, due.value);  // 고른 분류·마감일과 함께 추가한다
+  due.value = '';
   input.value = '';
   input.focus();
 });
