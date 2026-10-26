@@ -44,6 +44,15 @@ button { padding: 12px 20px; border-radius: 8px; }
   border: none;
 }
 
+#toggle-done {
+  margin-top: 16px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #0f766e;
+  background: #ffffff;
+  border: 1px solid #0f766e;
+}
+
 #list { list-style: none; padding: 0; }
 
 #list li {

@@ -4,6 +4,9 @@
 const KEY = 'todo-items';  // 이 브라우저 안(로컬 스토리지)에 저장할 이름
 let items = JSON.parse(localStorage.getItem(KEY) || '[]');
 
+const HIDE_KEY = 'todo-hide-done';  // 완료한 것을 숨기는 중인지 저장할 이름
+let hideDone = localStorage.getItem(HIDE_KEY) === 'true';
+
 function save() {
   localStorage.setItem(KEY, JSON.stringify(items));
 }
@@ -25,6 +28,7 @@ function render() {
   const list = document.querySelector('#list');
   list.innerHTML = '';
   items.forEach((item, i) => {
+    if (hideDone && item.done) return;  // 숨기는 중이면 완료한 줄은 만들지 않는다
     const li = document.createElement('li');
     if (item.done) li.classList.add('done');
 
@@ -67,9 +71,16 @@ function render() {
     li.append(del);
     list.append(li);
   });
-  // 남은 개수 = 체크하지 않은 것
+  document.querySelector('#toggle-done').textContent = hideDone ? '완료한 것 보기' : '완료한 것 숨기기';
+  // 남은 개수 = 체크하지 않은 것 (숨겨도 그대로)
   document.querySelector('#count').textContent = items.filter((item) => !item.done).length;
 }
+
+document.querySelector('#toggle-done').addEventListener('click', () => {
+  hideDone = !hideDone;
+  localStorage.setItem(HIDE_KEY, hideDone);
+  render();
+});
 
 const button = document.querySelector('#add');
 button.addEventListener('click', () => {
