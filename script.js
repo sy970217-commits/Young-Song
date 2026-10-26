@@ -35,9 +35,15 @@ function today() {
 function render() {
   const list = document.querySelector('#list');
   list.innerHTML = '';
-  // 중요 표시한 것이 맨 위로. 같은 쪽끼리는 추가한 순서 그대로 (i는 원래 자리 번호)
+  // 중요 표시한 것이 맨 위, 그 안에서 마감일 가까운 순 (i는 원래 자리 번호)
   const order = items.map((item, i) => ({ item, i }));
-  order.sort((a, b) => Boolean(b.item.star) - Boolean(a.item.star));
+  order.sort((a, b) => {
+    if (Boolean(a.item.star) !== Boolean(b.item.star)) return Boolean(b.item.star) - Boolean(a.item.star);
+    if (a.item.due && b.item.due) return a.item.due < b.item.due ? -1 : a.item.due > b.item.due ? 1 : 0;  // 마감일이 가까운 순
+    if (a.item.due) return -1;  // 마감일이 있는 것이 없는 것보다 위
+    if (b.item.due) return 1;
+    return 0;                   // 마감일이 없는 것끼리는 추가한 순서 그대로
+  });
   order.forEach(({ item, i }) => {
     if (hideDone && item.done) return;  // 숨기는 중이면 완료한 줄은 만들지 않는다
     const li = document.createElement('li');
