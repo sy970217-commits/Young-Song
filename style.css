@@ -44,7 +44,8 @@ button { padding: 12px 20px; border-radius: 8px; }
   border: none;
 }
 
-#toggle-done {
+#toggle-done,
+#theme {
   margin-top: 16px;
   padding: 8px 12px;
   font-size: 14px;
@@ -106,3 +107,45 @@ button { padding: 12px 20px; border-radius: 8px; }
 
 li.done { color: #9ca3af; }
 li.done .label { text-decoration: line-through; }
+
+#theme { margin-top: 0; margin-bottom: 16px; }
+
+/* 어두운 화면: body에 dark 클래스가 붙으면 색만 바뀐다 */
+body.dark {
+  color-scheme: dark;
+  background: #0b0f12;
+  color: #e5e7eb;
+}
+
+body.dark h1 { color: #2dd4bf; }
+
+body.dark #item,
+body.dark #category,
+body.dark #due {
+  color: #e5e7eb;
+  background: #12181d;
+  border-color: #1f4a46;
+}
+
+body.dark #add {
+  color: #04120f;
+  background: #14b8a6;
+}
+
+body.dark #toggle-done,
+body.dark #theme,
+body.dark #list li button {
+  color: #2dd4bf;
+  background: transparent;
+  border-color: #2dd4bf;
+}
+
+body.dark #list li { border-bottom-color: #1f2933; }
+
+body.dark #list li button.star { color: #6b7280; background: none; border: none; }
+body.dark #list li button.star.on { color: #facc15; }
+
+body.dark .tag { color: #5eead4; background: #12332f; }
+body.dark .due { color: #9ca3af; }
+body.dark .due.overdue { color: #f87171; }
+body.dark li.done { color: #6b7280; }

@@ -7,6 +7,14 @@ let items = JSON.parse(localStorage.getItem(KEY) || '[]');
 const HIDE_KEY = 'todo-hide-done';  // 완료한 것을 숨기는 중인지 저장할 이름
 let hideDone = localStorage.getItem(HIDE_KEY) === 'true';
 
+const THEME_KEY = 'todo-dark';  // 어두운 화면을 쓰는 중인지 저장할 이름
+let dark = localStorage.getItem(THEME_KEY) === 'true';
+
+function applyTheme() {
+  document.body.classList.toggle('dark', dark);
+  document.querySelector('#theme').textContent = dark ? '밝은 화면' : '어두운 화면';
+}
+
 function save() {
   localStorage.setItem(KEY, JSON.stringify(items));
 }
@@ -98,6 +106,12 @@ document.querySelector('#toggle-done').addEventListener('click', () => {
   render();
 });
 
+document.querySelector('#theme').addEventListener('click', () => {
+  dark = !dark;
+  localStorage.setItem(THEME_KEY, dark);
+  applyTheme();
+});
+
 const button = document.querySelector('#add');
 button.addEventListener('click', () => {
   const input = document.querySelector('#item');
@@ -115,4 +129,5 @@ document.querySelector('#item').addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !event.isComposing) button.click();
 });
 
+applyTheme();
 render();
