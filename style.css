@@ -73,6 +73,11 @@ button {
   box-shadow: 0 0 14px rgba(25, 240, 210, 0.5);
 }
 
+button:hover {
+  background: #5ff5df;
+  border-color: #5ff5df;
+}
+
 button:active {
   opacity: 0.85;
 }
