@@ -149,3 +149,13 @@ body.dark .tag { color: #5eead4; background: #12332f; }
 body.dark .due { color: #9ca3af; }
 body.dark .due.overdue { color: #f87171; }
 body.dark li.done { color: #6b7280; }
+
+/* 제목 위 사진: 휴대폰 폭에 맞게 줄이고 모서리는 둥글게 */
+#photo {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin-bottom: 16px;
+  border-radius: 16px;
+}
