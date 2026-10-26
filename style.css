@@ -58,6 +58,7 @@ button { padding: 12px 20px; border-radius: 8px; }
 
 #list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 12px 0;
@@ -159,3 +160,33 @@ body.dark li.done { color: #6b7280; }
   margin-bottom: 16px;
   border-radius: 16px;
 }
+
+/* 링크·이미지: 작은 버튼, 주소 링크, 줄 아래 미리보기 */
+#list li button.attach {
+  margin-left: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.file-link {
+  max-width: 90px;
+  overflow: hidden;
+  font-size: 12px;
+  color: #0f766e;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thumb {
+  flex-basis: 100%;
+  margin-left: 34px;
+}
+
+.thumb img {
+  display: block;
+  max-width: 100%;
+  max-height: 120px;
+  border-radius: 8px;
+}
+
+body.dark .file-link { color: #2dd4bf; }

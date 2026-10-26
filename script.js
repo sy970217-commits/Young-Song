@@ -17,6 +17,14 @@ async function api(query, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+const IMAGE_BUCKET = 'images';          // 이미지를 올리는 Supabase 저장소 이름
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;  // 5MB
+
+// http:// 또는 https://로 시작하는 주소만 링크로 쓴다
+function isWebAddress(text) {
+  return /^https?:\/\//i.test(text);
+}
+
 function showError() {
   alert('표에 저장하지 못했어요. 인터넷 연결을 확인하고 다시 해 보세요.');
 }
@@ -24,8 +32,8 @@ function showError() {
 // 페이지를 열 때 표에서 목록을 읽어 온다
 async function loadItems() {
   try {
-    const rows = await api('?select=id,text,done,created_at&order=created_at.asc');
-    items = rows.map((row) => ({ id: row.id, text: row.text, done: row.done }));
+    const rows = await api('?select=*&order=created_at.asc');  // 링크·이미지 칸이 아직 없어도 읽힌다
+    items = rows.map((row) => ({ id: row.id, text: row.text, done: row.done, link_url: row.link_url, image_url: row.image_url }));
   } catch (error) {
     showError();
   }
@@ -42,6 +50,65 @@ function applyTheme() {
   document.body.classList.toggle('dark', dark);
   document.querySelector('#theme').textContent = dark ? '밝은 화면' : '어두운 화면';
 }
+
+// 링크 주소를 todos 표의 link_url 칸에 적는다
+async function addLink(item) {
+  const address = (prompt('링크 주소를 적어 주세요 (http:// 또는 https://로 시작)') || '').trim();
+  if (address === '') return;
+  if (!isWebAddress(address)) {
+    alert('http:// 또는 https://로 시작하는 주소만 넣을 수 있어요.');
+    return;
+  }
+  try {
+    await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ link_url: address }) });
+    item.link_url = address;
+  } catch (error) {
+    showError();
+  }
+  render();
+}
+
+// 이미지를 저장소에 올리고, 그 주소를 todos 표의 image_url 칸에 적는다
+async function addImage(item, file) {
+  if (!file.type.startsWith('image/')) {
+    alert('이미지 파일만 올릴 수 있어요.');
+    return;
+  }
+  if (file.size > MAX_IMAGE_SIZE) {
+    alert('이미지가 너무 커요. 5MB 이하만 올릴 수 있어요.');
+    return;
+  }
+  // 저장소 이름에는 한글을 못 쓰므로 번호와 확장자만 쓴다
+  const extension = (file.name.match(/\.[A-Za-z0-9]+$/) || [''])[0];
+  const key = item.id + '-' + Date.now() + extension;
+  try {
+    const upload = await fetch(SUPABASE_URL + '/storage/v1/object/' + IMAGE_BUCKET + '/' + key, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': file.type },
+      body: file,
+    });
+    if (!upload.ok) throw new Error('Storage ' + upload.status);
+    const imageUrl = SUPABASE_URL + '/storage/v1/object/public/' + IMAGE_BUCKET + '/' + key;
+    await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ image_url: imageUrl }) });
+    item.image_url = imageUrl;
+  } catch (error) {
+    showError();
+  }
+  render();
+}
+
+// 이미지 고르는 창을 여는 보이지 않는 입력칸 (화면에 붙여 둬야 휴대폰에서도 잘 열린다)
+const picker = document.createElement('input');
+picker.type = 'file';
+picker.accept = 'image/*';
+picker.hidden = true;
+document.body.append(picker);
+let pickingItem = null;  // 지금 이미지를 붙이려는 할 일
+picker.addEventListener('change', () => {
+  const file = picker.files[0];
+  picker.value = '';
+  if (file && pickingItem) addImage(pickingItem, file);
+});
 
 async function addItem(text, category, due) {
   try {
@@ -124,6 +191,40 @@ function render() {
       if (item.due < today() && !item.done) dueLabel.classList.add('overdue');
     }
 
+    // 링크가 있으면 주소 링크, 없으면 '링크' 버튼
+    let linkPart;
+    if (item.link_url && isWebAddress(item.link_url)) {
+      linkPart = document.createElement('a');
+      linkPart.className = 'file-link';
+      linkPart.href = item.link_url;
+      linkPart.target = '_blank';
+      linkPart.rel = 'noopener noreferrer';
+      try {
+        linkPart.textContent = new URL(item.link_url).hostname;
+      } catch (error) {
+        linkPart.textContent = '링크';
+      }
+    } else {
+      linkPart = document.createElement('button');
+      linkPart.type = 'button';
+      linkPart.className = 'attach';
+      linkPart.textContent = '링크';
+      linkPart.addEventListener('click', () => addLink(item));
+    }
+
+    // 이미지가 없으면 '이미지' 버튼
+    let imageButton = null;
+    if (!item.image_url) {
+      imageButton = document.createElement('button');
+      imageButton.type = 'button';
+      imageButton.className = 'attach';
+      imageButton.textContent = '이미지';
+      imageButton.addEventListener('click', () => {
+        pickingItem = item;
+        picker.click();
+      });
+    }
+
     const del = document.createElement('button');
     del.type = 'button';
     del.textContent = '삭제';
@@ -139,7 +240,23 @@ function render() {
 
     li.append(check, star, label, tag);
     if (item.due) li.append(dueLabel);
+    li.append(linkPart);
+    if (imageButton) li.append(imageButton);
     li.append(del);
+
+    // 이미지가 있으면 줄 아래에 작은 미리보기 (누르면 크게 열린다)
+    if (item.image_url && isWebAddress(item.image_url)) {
+      const imageLink = document.createElement('a');
+      imageLink.className = 'thumb';
+      imageLink.href = item.image_url;
+      imageLink.target = '_blank';
+      imageLink.rel = 'noopener noreferrer';
+      const thumb = document.createElement('img');
+      thumb.src = item.image_url;
+      thumb.alt = item.text + ' 이미지';
+      imageLink.append(thumb);
+      li.append(imageLink);
+    }
     list.append(li);
   });
   document.querySelector('#toggle-done').textContent = hideDone ? '완료한 것 보기' : '완료한 것 숨기기';
