@@ -10,25 +10,39 @@
   <img id="photo" src="https://sijsxqhlaxtlmxdkmhuk.supabase.co/storage/v1/object/public/photos/todo-logo-raw.png" alt="로고">
   <h1>양도권 등록</h1>
   <button id="theme" type="button">어두운 화면</button>
-  <input id="movie" placeholder="영화제목">
-  <select id="theater" aria-label="극장">
-    <option>CGV 제주</option>
-    <option>CGV 제주노형</option>
-    <option>롯데시네마 제주연동</option>
-    <option>롯데시네마 서귀포</option>
-    <option>메가박스 제주아라</option>
-    <option>메가박스 제주삼화</option>
-    <option>메가박스 제주서귀포</option>
-  </select>
-  <div class="price-row">
-    <button id="price-minus" type="button" aria-label="가격 500원 내리기">−500</button>
-    <input id="price" type="number" min="0" step="1" inputmode="numeric" placeholder="가격 (원)">
-    <button id="price-plus" type="button" aria-label="가격 500원 올리기">+500</button>
+  <div id="auth-out">
+    <input id="email" type="email" placeholder="이메일" autocomplete="email">
+    <input id="password" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password">
+    <div class="auth-buttons">
+      <button id="login" type="button">로그인</button>
+      <button id="signup" type="button">가입</button>
+    </div>
   </div>
-  <label class="check-row"><input id="recliner" type="checkbox"> 리클라이너</label>
-  <input id="link" type="url" inputmode="url" placeholder="링크 주소 (안 넣어도 됨)">
-  <input id="show-time" type="time" aria-label="상영시간">
-  <button id="add" type="button">추가</button>
+  <div id="auth-in" hidden>
+    <span id="who"></span>
+    <button id="logout" type="button">로그아웃</button>
+  </div>
+  <div id="add-form" hidden>
+    <input id="movie" placeholder="영화제목">
+    <select id="theater" aria-label="극장">
+      <option>CGV 제주</option>
+      <option>CGV 제주노형</option>
+      <option>롯데시네마 제주연동</option>
+      <option>롯데시네마 서귀포</option>
+      <option>메가박스 제주아라</option>
+      <option>메가박스 제주삼화</option>
+      <option>메가박스 제주서귀포</option>
+    </select>
+    <div class="price-row">
+      <button id="price-minus" type="button" aria-label="가격 500원 내리기">−500</button>
+      <input id="price" type="number" min="0" step="1" inputmode="numeric" placeholder="가격 (원)">
+      <button id="price-plus" type="button" aria-label="가격 500원 올리기">+500</button>
+    </div>
+    <label class="check-row"><input id="recliner" type="checkbox"> 리클라이너</label>
+    <input id="link" type="url" inputmode="url" placeholder="링크 주소 (안 넣어도 됨)">
+    <input id="show-time" type="time" aria-label="상영시간">
+    <button id="add" type="button">추가</button>
+  </div>
   <button id="toggle-done" type="button">판매 완료한 것 숨기기</button>
   <ul id="list"></ul>
   <p>판매 중: <span id="count">0</span>개</p>

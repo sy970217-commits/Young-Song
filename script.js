@@ -7,12 +7,81 @@ const SUPABASE_KEY = 'sb_publishable_9pOuskQ0vs7Cd5yTa5iM1g_FDr6FK3h';
 
 let items = [];  // 표에서 읽어 온 줄들
 
+// ---- 로그인 (Supabase Auth) ----
+const SESSION_KEY = 'ticket-session';  // 로그인 정보를 이 브라우저에 저장할 이름
+let session = readSession();           // 로그인 안 했으면 null
+
+function readSession() {
+  try {
+    return JSON.parse(localStorage.getItem(SESSION_KEY));
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveSession(data) {
+  session = {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: Date.now() + (data.expires_in || 3600) * 1000,
+    user_id: data.user.id,
+    email: data.user.email,
+  };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+function clearSession() {
+  session = null;
+  localStorage.removeItem(SESSION_KEY);
+}
+
+// 로그인·가입·로그아웃 요청을 Supabase에 보낸다
+async function authRequest(path, body, token) {
+  const headers = { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const response = await fetch(SUPABASE_URL + '/auth/v1' + path, { method: 'POST', headers: headers, body: JSON.stringify(body || {}) });
+  if (!response.ok) throw new Error('Auth ' + response.status);
+  return response.status === 204 ? null : response.json();
+}
+
+// 로그인 열쇠(토큰)가 곧 끝나면 새로 받는다. 못 받으면 로그아웃 상태가 된다
+async function validToken() {
+  if (!session) return null;
+  if (session.expires_at - Date.now() > 60 * 1000) return session.access_token;
+  try {
+    saveSession(await authRequest('/token?grant_type=refresh_token', { refresh_token: session.refresh_token }));
+    return session.access_token;
+  } catch (error) {
+    clearSession();
+    applyAuth();
+    return null;
+  }
+}
+
+// 모든 Supabase 요청에 붙이는 머리말: 공개 키, 로그인했으면 내 열쇠도
+async function authHeaders() {
+  const headers = { apikey: SUPABASE_KEY };
+  const token = await validToken();
+  if (token) headers.Authorization = 'Bearer ' + token;
+  return headers;
+}
+
+// 내가 쓴 글인가
+function canEdit(item) {
+  return Boolean(session) && item.user_id === session.user_id;
+}
+
 // tickets 표에 요청을 보낸다. 실패하면 오류를 던진다
 async function api(query, options = {}) {
   const response = await fetch(SUPABASE_URL + '/rest/v1/tickets' + query, {
     ...options,
-    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json', ...options.headers },
+    headers: { ...(await authHeaders()), 'Content-Type': 'application/json', ...options.headers },
   });
+  if (response.status === 401) {
+    clearSession();
+    applyAuth();
+    alert('로그인이 풀렸어요. 다시 로그인해 주세요.');
+  }
   if (!response.ok) throw new Error('Supabase ' + response.status);
   return response.status === 204 ? null : response.json();
 }
@@ -35,6 +104,7 @@ async function loadItems() {
     const rows = await api('?select=*&order=created_at.asc');
     items = rows.map((row) => ({
       id: row.id,
+      user_id: row.user_id,
       movie: row.movie,
       theater: row.theater,
       price: row.price,
@@ -98,7 +168,7 @@ async function deleteStoredImage(imageUrl) {
   try {
     const response = await fetch(SUPABASE_URL + '/storage/v1/object/' + IMAGE_BUCKET, {
       method: 'DELETE',
-      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
       body: JSON.stringify({ prefixes: [key] }),
     });
     const removed = response.ok ? await response.json() : [];
@@ -140,7 +210,7 @@ async function addImage(item, file) {
   try {
     const upload = await fetch(SUPABASE_URL + '/storage/v1/object/' + IMAGE_BUCKET + '/' + key, {
       method: 'POST',
-      headers: { apikey: SUPABASE_KEY, 'Content-Type': file.type },
+      headers: { ...(await authHeaders()), 'Content-Type': file.type },
       body: file,
     });
     if (!upload.ok) throw new Error('Storage ' + upload.status);
@@ -177,7 +247,7 @@ async function addItem(movie, theater, price, recliner, link, showTime) {
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, show_time: showTime || null, sold: false, star: false }),
     });
-    items.push({ id: rows[0].id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, showTime: showTime || null, sold: false, star: false });  // 목록 맨 아래에
+    items.push({ id: rows[0].id, user_id: session.user_id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, showTime: showTime || null, sold: false, star: false });  // 목록 맨 아래에
   } catch (error) {
     showError();
   }
@@ -208,10 +278,12 @@ function render() {
     if (hideDone && item.sold) return;  // 숨기는 중이면 판매 완료한 줄은 만들지 않는다
     const li = document.createElement('li');
     if (item.sold) li.classList.add('done');
+    const mine = canEdit(item);  // 내가 쓴 글만 고치고 지울 수 있다
 
     const check = document.createElement('input');
     check.type = 'checkbox';
     check.checked = item.sold;
+    check.disabled = !mine;
     check.setAttribute('aria-label', '판매 완료');
     check.addEventListener('change', async () => {
       item.sold = check.checked;
@@ -229,6 +301,7 @@ function render() {
     star.type = 'button';
     star.className = 'star' + (item.star ? ' on' : '');
     star.textContent = item.star ? '★' : '☆';
+    star.disabled = !mine;
     star.setAttribute('aria-label', '중요 표시');
     star.setAttribute('aria-pressed', item.star ? 'true' : 'false');
     star.addEventListener('click', async () => {
@@ -255,7 +328,7 @@ function render() {
     ].filter(Boolean).join(' ');
 
     // 링크가 있으면 주소 링크, 없으면 '링크' 버튼
-    let linkPart;
+    let linkPart = null;
     let linkEdit = [];
     if (item.link_url && isWebAddress(item.link_url)) {
       linkPart = document.createElement('a');
@@ -268,11 +341,13 @@ function render() {
       } catch (error) {
         linkPart.textContent = '링크';
       }
-      linkEdit = [
-        smallButton('수정', '링크 수정', () => addLink(item)),
-        smallButton('×', '링크 지우기', () => removeLink(item)),
-      ];
-    } else {
+      if (mine) {
+        linkEdit = [
+          smallButton('수정', '링크 수정', () => addLink(item)),
+          smallButton('×', '링크 지우기', () => removeLink(item)),
+        ];
+      }
+    } else if (mine) {
       linkPart = document.createElement('button');
       linkPart.type = 'button';
       linkPart.className = 'attach';
@@ -282,7 +357,7 @@ function render() {
 
     // 이미지가 없으면 '이미지' 버튼
     let imageButton = null;
-    if (!item.image_url) {
+    if (!item.image_url && mine) {
       imageButton = document.createElement('button');
       imageButton.type = 'button';
       imageButton.className = 'attach';
@@ -313,13 +388,15 @@ function render() {
     // 첫 줄(main): 체크·별표·한 줄 글자·삭제. 둘째 줄(info): 링크·이미지 버튼
     const main = document.createElement('div');
     main.className = 'row-main';
-    main.append(check, star, label, del);
+    main.append(check, star, label);
+    if (mine) main.append(del);
 
     const info = document.createElement('div');
     info.className = 'row-info';
-    info.append(linkPart, ...linkEdit);
+    if (linkPart) info.append(linkPart, ...linkEdit);
     if (imageButton) info.append(imageButton);
-    li.append(main, info);
+    li.append(main);
+    if (info.childElementCount) li.append(info);
 
     // 링크가 있는 줄은 버튼·체크·링크 글자가 아닌 곳을 누르면 링크가 새 창으로 열린다
     if (item.link_url && isWebAddress(item.link_url)) {
@@ -343,14 +420,16 @@ function render() {
       thumb.src = item.image_url;
       thumb.alt = item.movie + ' 이미지';
       imageLink.append(thumb);
-      row.append(
-        imageLink,
-        smallButton('바꾸기', '이미지 바꾸기', () => {
-          pickingItem = item;
-          picker.click();
-        }),
-        smallButton('×', '이미지 지우기', () => removeImage(item))
-      );
+      row.append(imageLink);
+      if (mine) {
+        row.append(
+          smallButton('바꾸기', '이미지 바꾸기', () => {
+            pickingItem = item;
+            picker.click();
+          }),
+          smallButton('×', '이미지 지우기', () => removeImage(item))
+        );
+      }
       li.append(row);
     }
     list.append(li);
@@ -364,6 +443,72 @@ document.querySelector('#toggle-done').addEventListener('click', () => {
   hideDone = !hideDone;
   localStorage.setItem(HIDE_KEY, hideDone);
   render();
+});
+
+// 로그인 상태에 따라 화면을 바꾼다 (로그인 칸 / 내 이메일·로그아웃 / 추가 입력 칸)
+function applyAuth() {
+  document.querySelector('#auth-out').hidden = Boolean(session);
+  document.querySelector('#auth-in').hidden = !session;
+  document.querySelector('#add-form').hidden = !session;
+  document.querySelector('#who').textContent = session ? session.email : '';
+  render();
+}
+
+function authFields() {
+  return { email: document.querySelector('#email').value.trim(), password: document.querySelector('#password').value };
+}
+
+async function logIn() {
+  const { email, password } = authFields();
+  if (email === '' || password === '') {
+    alert('이메일과 비밀번호를 적어 주세요.');
+    return;
+  }
+  try {
+    saveSession(await authRequest('/token?grant_type=password', { email: email, password: password }));
+  } catch (error) {
+    alert('로그인하지 못했어요. 이메일과 비밀번호를 확인해 주세요. (가입 직후라면 메일 인증이 필요할 수 있어요)');
+    return;
+  }
+  document.querySelector('#password').value = '';
+  applyAuth();
+  await loadItems();
+}
+
+async function signUp() {
+  const { email, password } = authFields();
+  if (email === '' || password.length < 6) {
+    alert('이메일을 적고, 비밀번호는 6자 이상으로 적어 주세요.');
+    return;
+  }
+  try {
+    const data = await authRequest('/signup', { email: email, password: password });
+    if (data && data.access_token) {
+      saveSession(data);  // 메일 인증이 꺼져 있으면 가입과 함께 로그인된다
+      document.querySelector('#password').value = '';
+      applyAuth();
+      await loadItems();
+    } else {
+      alert('가입했어요. 메일로 인증 링크를 보냈으면 링크를 누른 뒤 로그인해 주세요.');
+    }
+  } catch (error) {
+    alert('가입하지 못했어요. 이미 가입한 이메일이거나 비밀번호가 너무 짧을 수 있어요.');
+  }
+}
+
+async function logOut() {
+  try {
+    await authRequest('/logout', {}, await validToken());
+  } catch (error) {}  // 서버에 알리지 못해도 이 브라우저에서는 로그아웃한다
+  clearSession();
+  applyAuth();
+}
+
+document.querySelector('#login').addEventListener('click', logIn);
+document.querySelector('#signup').addEventListener('click', signUp);
+document.querySelector('#logout').addEventListener('click', logOut);
+document.querySelector('#password').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.isComposing) logIn();
 });
 
 document.querySelector('#theme').addEventListener('click', () => {
@@ -414,4 +559,5 @@ document.querySelector('#movie').addEventListener('keydown', (event) => {
 });
 
 applyTheme();
+applyAuth();
 loadItems();
