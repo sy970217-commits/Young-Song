@@ -40,8 +40,33 @@ async function authRequest(path, body, token) {
   const headers = { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' };
   if (token) headers.Authorization = 'Bearer ' + token;
   const response = await fetch(SUPABASE_URL + '/auth/v1' + path, { method: 'POST', headers: headers, body: JSON.stringify(body || {}) });
-  if (!response.ok) throw new Error('Auth ' + response.status);
+  if (!response.ok) {
+    // 실패하면 Supabase가 알려 준 이유(code·메시지)를 담아서 던진다
+    const reason = await response.json().catch(() => ({}));
+    const error = new Error('Auth ' + response.status);
+    error.status = response.status;
+    error.code = reason.error_code || reason.error || '';
+    error.detail = reason.msg || reason.error_description || reason.message || '';
+    throw error;
+  }
   return response.status === 204 ? null : response.json();
+}
+
+// 로그인·가입이 실패한 이유를 쉬운 말로 알려 준다 (맨 끝에 Supabase가 보낸 원인도 붙인다)
+function authErrorMessage(action, error) {
+  const code = error.code;
+  let hint;
+  if (!error.status) hint = '인터넷에 연결되지 않았거나 Supabase에 닿지 않아요.';
+  else if (code === 'email_provider_disabled' || code === 'signup_disabled') hint = 'Supabase에서 이메일 가입이 꺼져 있어요. Authentication → Sign In / Providers → Email를 켜 주세요.';
+  else if (code === 'over_email_send_rate_limit' || error.status === 429) hint = '메일을 너무 많이 보내서 잠시 막혔어요. 잠시 뒤에 다시 하거나, Supabase에서 Confirm email을 꺼 주세요.';
+  else if (code === 'user_already_exists') hint = '이미 가입한 이메일이에요. 로그인해 주세요.';
+  else if (code === 'weak_password') hint = '비밀번호가 너무 약해요. 더 길고 복잡하게 바꿔 보세요.';
+  else if (code === 'email_address_invalid' || code === 'validation_failed') hint = '이메일 주소가 올바르지 않아요.';
+  else if (code === 'invalid_credentials') hint = '이메일이나 비밀번호가 틀렸어요. 가입하지 않았다면 먼저 가입해 주세요.';
+  else if (code === 'email_not_confirmed') hint = '메일 인증이 안 됐어요. 받은 메일의 링크를 누른 뒤 로그인해 주세요.';
+  else hint = '이유를 알 수 없어요.';
+  const server = error.status ? '\n(Supabase 답: ' + error.status + ' ' + code + ' ' + error.detail + ')' : '';
+  return action + '하지 못했어요. ' + hint + server;
 }
 
 // 로그인 열쇠(토큰)가 곧 끝나면 새로 받는다. 못 받으면 로그아웃 상태가 된다
@@ -467,7 +492,7 @@ async function logIn() {
   try {
     saveSession(await authRequest('/token?grant_type=password', { email: email, password: password }));
   } catch (error) {
-    alert('로그인하지 못했어요. 이메일과 비밀번호를 확인해 주세요. (가입 직후라면 메일 인증이 필요할 수 있어요)');
+    alert(authErrorMessage('로그인', error));
     return;
   }
   document.querySelector('#password').value = '';
@@ -492,7 +517,7 @@ async function signUp() {
       alert('가입했어요. 메일로 인증 링크를 보냈으면 링크를 누른 뒤 로그인해 주세요.');
     }
   } catch (error) {
-    alert('가입하지 못했어요. 이미 가입한 이메일이거나 비밀번호가 너무 짧을 수 있어요.');
+    alert(authErrorMessage('가입', error));
   }
 }
 
