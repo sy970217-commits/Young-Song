@@ -152,8 +152,6 @@ async function loadItems() {
       recliner: row.recliner,
       phone: row.phone,
       showTime: row.show_time ? row.show_time.slice(0, 5) : null,  // 19:50:00 -> 19:50
-      sold: row.sold,
-      star: row.star,
       link_url: row.link_url,
       image_url: row.image_url,
     }));
@@ -163,44 +161,12 @@ async function loadItems() {
   render();
 }
 
-const HIDE_KEY = 'todo-hide-done';  // 판매 완료한 것을 숨기는 중인지 저장할 이름
-let hideDone = localStorage.getItem(HIDE_KEY) === 'true';
-
 const THEME_KEY = 'todo-dark';  // 어두운 화면을 쓰는 중인지 저장할 이름
 let dark = localStorage.getItem(THEME_KEY) === 'true';
 
 function applyTheme() {
   document.body.classList.toggle('dark', dark);
   document.querySelector('#theme').textContent = dark ? '밝은 화면' : '어두운 화면';
-}
-
-// 링크 주소를 tickets 표의 link_url 칸에 적는다 (이미 있으면 수정)
-async function addLink(item) {
-  const address = (prompt('링크 주소를 적어 주세요 (http:// 또는 https://로 시작)', item.link_url || '') || '').trim();
-  if (address === '' || address === item.link_url) return;
-  if (!isWebAddress(address)) {
-    alert('http:// 또는 https://로 시작하는 주소만 넣을 수 있어요.');
-    return;
-  }
-  try {
-    await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ link_url: address }) });
-    item.link_url = address;
-  } catch (error) {
-    showError();
-  }
-  render();
-}
-
-// 링크를 지운다
-async function removeLink(item) {
-  if (!confirm('링크를 지울까요?')) return;
-  try {
-    await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ link_url: null }) });
-    item.link_url = null;
-  } catch (error) {
-    showError();
-  }
-  render();
 }
 
 // 저장소에 있는 이미지 파일을 지운다 (표에서 주소를 뺀 뒤에 부른다)
@@ -287,9 +253,9 @@ async function addItem(movie, theater, price, recliner, link, phone, showTime) {
     const rows = await api('', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, show_time: showTime || null, sold: false, star: false }),
+      body: JSON.stringify({ movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, show_time: showTime || null }),
     });
-    items.push({ id: rows[0].id, user_id: session.user_id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, showTime: showTime || null, sold: false, star: false });  // 목록 맨 아래에
+    items.push({ id: rows[0].id, user_id: session.user_id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, showTime: showTime || null });  // 목록 맨 아래에
   } catch (error) {
     showError();
   }
@@ -310,53 +276,9 @@ function smallButton(text, label, onClick) {
 function render() {
   const list = document.querySelector('#list');
   list.innerHTML = '';
-  // 중요 표시한 것이 맨 위, 같은 쪽끼리는 추가한 순서 그대로
-  const order = items.map((item) => ({ item }));
-  order.sort((a, b) => {
-    if (Boolean(a.item.star) !== Boolean(b.item.star)) return Boolean(b.item.star) - Boolean(a.item.star);
-    return 0;
-  });
-  order.forEach(({ item }) => {
-    if (hideDone && item.sold) return;  // 숨기는 중이면 판매 완료한 줄은 만들지 않는다
+  items.forEach((item) => {
     const li = document.createElement('li');
-    if (item.sold) li.classList.add('done');
-    const mine = canEdit(item);  // 내가 쓴 글만 고치고 지울 수 있다
-
-    const check = document.createElement('input');
-    check.type = 'checkbox';
-    check.checked = item.sold;
-    check.disabled = !mine;
-    check.setAttribute('aria-label', '판매 완료');
-    check.addEventListener('change', async () => {
-      item.sold = check.checked;
-      render();
-      try {
-        await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ sold: item.sold }) });
-      } catch (error) {
-        item.sold = !item.sold;  // 저장 실패하면 원래대로
-        showError();
-        render();
-      }
-    });
-
-    const star = document.createElement('button');
-    star.type = 'button';
-    star.className = 'star' + (item.star ? ' on' : '');
-    star.textContent = item.star ? '★' : '☆';
-    star.disabled = !mine;
-    star.setAttribute('aria-label', '중요 표시');
-    star.setAttribute('aria-pressed', item.star ? 'true' : 'false');
-    star.addEventListener('click', async () => {
-      item.star = !item.star;
-      render();
-      try {
-        await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ star: item.star }) });
-      } catch (error) {
-        item.star = !item.star;  // 저장 실패하면 원래대로
-        showError();
-        render();
-      }
-    });
+    const mine = canEdit(item);  // 내가 쓴 글만 지울 수 있다
 
     const label = document.createElement('span');
     label.className = 'label';
@@ -368,34 +290,6 @@ function render() {
       Number(item.price || 0) + '원',
       item.recliner ? '리클라이너' : '',
     ].filter(Boolean).join(' ');
-
-    // 링크가 있으면 주소 링크, 없으면 '링크' 버튼
-    let linkPart = null;
-    let linkEdit = [];
-    if (item.link_url && isWebAddress(item.link_url)) {
-      linkPart = document.createElement('a');
-      linkPart.className = 'file-link';
-      linkPart.href = item.link_url;
-      linkPart.target = '_blank';
-      linkPart.rel = 'noopener noreferrer';
-      try {
-        linkPart.textContent = new URL(item.link_url).hostname;
-      } catch (error) {
-        linkPart.textContent = '링크';
-      }
-      if (mine) {
-        linkEdit = [
-          smallButton('수정', '링크 수정', () => addLink(item)),
-          smallButton('×', '링크 지우기', () => removeLink(item)),
-        ];
-      }
-    } else if (mine) {
-      linkPart = document.createElement('button');
-      linkPart.type = 'button';
-      linkPart.className = 'attach';
-      linkPart.textContent = '링크';
-      linkPart.addEventListener('click', () => addLink(item));
-    }
 
     // 이미지가 없으면 '이미지' 버튼
     let imageButton = null;
@@ -427,27 +321,27 @@ function render() {
       if (imageUrl) await deleteStoredImage(imageUrl);  // 이미지가 있었으면 저장소에서도 지운다
     });
 
-    // 첫 줄(main): 체크·별표·한 줄 글자·삭제. 둘째 줄(info): 링크·이미지 버튼
+    // 첫 줄(main): 한 줄 글자·삭제. 둘째 줄(info): 전화번호·전화 버튼·이미지 버튼
     const main = document.createElement('div');
     main.className = 'row-main';
-    main.append(check, star, label);
+    main.append(label);
     if (mine) main.append(del);
 
     const info = document.createElement('div');
     info.className = 'row-info';
     if (item.phone && /^[0-9-]+$/.test(item.phone)) {
-      const phoneLink = document.createElement('a');
-      phoneLink.className = 'phone-link';
-      phoneLink.href = 'tel:' + item.phone.replace(/-/g, '');
-      phoneLink.textContent = '전화 ' + item.phone;
-      info.append(phoneLink);
+      const phoneText = document.createElement('span');
+      phoneText.className = 'phone-text';
+      phoneText.textContent = item.phone;
+      info.append(phoneText, smallButton('전화', '전화 걸기', () => {
+        location.href = 'tel:' + item.phone.replace(/-/g, '');  // 전화 앱이 열린다
+      }));
     }
-    if (linkPart) info.append(linkPart, ...linkEdit);
     if (imageButton) info.append(imageButton);
     li.append(main);
     if (info.childElementCount) li.append(info);
 
-    // 링크가 있는 줄은 버튼·체크·링크 글자가 아닌 곳을 누르면 링크가 새 창으로 열린다
+    // 링크가 있는 줄은 버튼이 아닌 곳을 누르면 링크가 새 창으로 열린다
     if (item.link_url && isWebAddress(item.link_url)) {
       li.classList.add('has-link');
       li.addEventListener('click', (event) => {
@@ -483,16 +377,8 @@ function render() {
     }
     list.append(li);
   });
-  document.querySelector('#toggle-done').textContent = hideDone ? '판매 완료한 것 보기' : '판매 완료한 것 숨기기';
-  // 판매 중인 개수 = 판매 완료가 아닌 것 (숨겨도 그대로)
-  document.querySelector('#count').textContent = items.filter((item) => !item.sold).length;
+  document.querySelector('#count').textContent = items.length;  // 판매 중인 개수 = 목록에 있는 양도권 수
 }
-
-document.querySelector('#toggle-done').addEventListener('click', () => {
-  hideDone = !hideDone;
-  localStorage.setItem(HIDE_KEY, hideDone);
-  render();
-});
 
 let formOpen = false;  // 등록 사항 입력 칸이 펼쳐져 있는지 (처음에는 접혀 있다)
 
