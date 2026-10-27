@@ -39,7 +39,7 @@ async function loadItems() {
       theater: row.theater,
       price: row.price,
       recliner: row.recliner,
-      showDate: row.show_date,
+      showTime: row.show_time ? row.show_time.slice(0, 5) : null,  // 19:50:00 -> 19:50
       sold: row.sold,
       star: row.star,
       link_url: row.link_url,
@@ -170,25 +170,18 @@ picker.addEventListener('change', () => {
   if (file && pickingItem) addImage(pickingItem, file);
 });
 
-async function addItem(movie, theater, price, recliner, link, showDate) {
+async function addItem(movie, theater, price, recliner, link, showTime) {
   try {
     const rows = await api('', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, show_date: showDate || null, sold: false, star: false }),
+      body: JSON.stringify({ movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, show_time: showTime || null, sold: false, star: false }),
     });
-    items.push({ id: rows[0].id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, showDate: showDate || null, sold: false, star: false });  // 목록 맨 아래에
+    items.push({ id: rows[0].id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, showTime: showTime || null, sold: false, star: false });  // 목록 맨 아래에
   } catch (error) {
     showError();
   }
   render();
-}
-
-// 오늘 날짜를 '2026-10-26' 모양으로 (이 기기의 시간 기준)
-function today() {
-  const now = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
 }
 
 // 줄 안에 쓰는 작은 버튼
@@ -205,14 +198,11 @@ function smallButton(text, label, onClick) {
 function render() {
   const list = document.querySelector('#list');
   list.innerHTML = '';
-  // 중요 표시한 것이 맨 위, 그 안에서 상영일 가까운 순
+  // 중요 표시한 것이 맨 위, 같은 쪽끼리는 추가한 순서 그대로
   const order = items.map((item) => ({ item }));
   order.sort((a, b) => {
     if (Boolean(a.item.star) !== Boolean(b.item.star)) return Boolean(b.item.star) - Boolean(a.item.star);
-    if (a.item.showDate && b.item.showDate) return a.item.showDate < b.item.showDate ? -1 : a.item.showDate > b.item.showDate ? 1 : 0;  // 상영일이 가까운 순
-    if (a.item.showDate) return -1;  // 상영일이 있는 것이 없는 것보다 위
-    if (b.item.showDate) return 1;
-    return 0;                        // 상영일이 없는 것끼리는 추가한 순서 그대로
+    return 0;
   });
   order.forEach(({ item }) => {
     if (hideDone && item.sold) return;  // 숨기는 중이면 판매 완료한 줄은 만들지 않는다
@@ -255,29 +245,14 @@ function render() {
 
     const label = document.createElement('span');
     label.className = 'label';
-    label.textContent = item.movie;
-
-    const tag = document.createElement('span');
-    tag.className = 'tag';
-    tag.textContent = item.theater || '';
-
-    const reclinerTag = document.createElement('span');
-    reclinerTag.className = 'tag';
-    reclinerTag.textContent = '리클라이너';
-
-    // 가격은 12,000원처럼 쉼표를 넣어 보여 준다
-    const priceLabel = document.createElement('span');
-    priceLabel.className = 'price';
-    priceLabel.textContent = Number(item.price || 0).toLocaleString('ko-KR') + '원';
-
-    // 상영일이 있으면 보여 주고, 지났는데 판매 완료가 아니면 붉게 한다
-    const dueLabel = document.createElement('span');
-    if (item.showDate) {
-      const [, month, day] = item.showDate.split('-');
-      dueLabel.className = 'due';
-      dueLabel.textContent = Number(month) + '/' + Number(day);
-      if (item.showDate < today() && !item.sold) dueLabel.classList.add('overdue');
-    }
+    // 영화 극장 상영시간 가격 리클라이너 순서의 한 줄 (예: 킬링타임 메가박스 제주아라 19:50 3000원 리클라이너)
+    label.textContent = [
+      item.movie,
+      item.theater,
+      item.showTime,
+      Number(item.price || 0) + '원',
+      item.recliner ? '리클라이너' : '',
+    ].filter(Boolean).join(' ');
 
     // 링크가 있으면 주소 링크, 없으면 '링크' 버튼
     let linkPart;
@@ -335,17 +310,13 @@ function render() {
       if (imageUrl) await deleteStoredImage(imageUrl);  // 이미지가 있었으면 저장소에서도 지운다
     });
 
-    // 첫 줄(main): 체크·별표·영화제목·삭제. 둘째 줄(info): 극장·가격·상영일·링크·이미지 버튼
+    // 첫 줄(main): 체크·별표·한 줄 글자·삭제. 둘째 줄(info): 링크·이미지 버튼
     const main = document.createElement('div');
     main.className = 'row-main';
     main.append(check, star, label, del);
 
     const info = document.createElement('div');
     info.className = 'row-info';
-    if (item.theater) info.append(tag);
-    if (item.recliner) info.append(reclinerTag);
-    info.append(priceLabel);
-    if (item.showDate) info.append(dueLabel);
     info.append(linkPart, ...linkEdit);
     if (imageButton) info.append(imageButton);
     li.append(main, info);
@@ -413,7 +384,7 @@ const button = document.querySelector('#add');
 button.addEventListener('click', () => {
   const movie = document.querySelector('#movie');
   const price = document.querySelector('#price');
-  const showDate = document.querySelector('#show-date');
+  const showTime = document.querySelector('#show-time');
   const recliner = document.querySelector('#recliner');
   const link = document.querySelector('#link');
   const title = movie.value.trim();
@@ -428,10 +399,10 @@ button.addEventListener('click', () => {
     alert('링크는 http:// 또는 https://로 시작하는 주소만 넣을 수 있어요.');
     return;
   }
-  addItem(title, document.querySelector('#theater').value, won, recliner.checked, address, showDate.value);
+  addItem(title, document.querySelector('#theater').value, won, recliner.checked, address, showTime.value);
   movie.value = '';
   price.value = '';
-  showDate.value = '';
+  showTime.value = '';
   recliner.checked = false;
   link.value = '';
   movie.focus();
