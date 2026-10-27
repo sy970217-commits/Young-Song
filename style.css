@@ -12,7 +12,8 @@ body {
 h1 { font-size: 28px; color: #0f766e; }
 
 #movie,
-#price {
+#price,
+#link {
   width: 100%;
   box-sizing: border-box;
   padding: 12px;
@@ -139,6 +140,7 @@ body.dark h1 { color: #2dd4bf; }
 
 body.dark #movie,
 body.dark #price,
+body.dark #link,
 body.dark #theater,
 body.dark #show-date {
   color: #e5e7eb;
@@ -153,6 +155,8 @@ body.dark #add {
 
 body.dark #toggle-done,
 body.dark #theme,
+body.dark #price-minus,
+body.dark #price-plus,
 body.dark #list li button {
   color: #2dd4bf;
   background: transparent;
@@ -225,3 +229,40 @@ body.dark .file-link { color: #2dd4bf; }
 }
 
 body.dark .price { color: #2dd4bf; }
+
+/* 가격 칸과 −500·+500 버튼, 리클라이너 체크 칸 */
+.price-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.price-row #price {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+#price-minus,
+#price-plus {
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #0f766e;
+  background: #ffffff;
+  border: 1px solid #0f766e;
+  white-space: nowrap;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: inherit;
+  font-size: 16px;
+}
+
+.check-row input { width: 22px; height: 22px; }
+
+/* 링크가 있는 줄은 눌러서 이동한다 */
+#list li.has-link { cursor: pointer; }

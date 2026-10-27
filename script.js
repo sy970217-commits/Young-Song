@@ -38,6 +38,7 @@ async function loadItems() {
       movie: row.movie,
       theater: row.theater,
       price: row.price,
+      recliner: row.recliner,
       showDate: row.show_date,
       sold: row.sold,
       star: row.star,
@@ -169,14 +170,14 @@ picker.addEventListener('change', () => {
   if (file && pickingItem) addImage(pickingItem, file);
 });
 
-async function addItem(movie, theater, price, showDate) {
+async function addItem(movie, theater, price, recliner, link, showDate) {
   try {
     const rows = await api('', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ movie: movie, theater: theater, price: price, show_date: showDate || null, sold: false, star: false }),
+      body: JSON.stringify({ movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, show_date: showDate || null, sold: false, star: false }),
     });
-    items.push({ id: rows[0].id, movie: movie, theater: theater, price: price, showDate: showDate || null, sold: false, star: false });  // 목록 맨 아래에
+    items.push({ id: rows[0].id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, showDate: showDate || null, sold: false, star: false });  // 목록 맨 아래에
   } catch (error) {
     showError();
   }
@@ -260,6 +261,10 @@ function render() {
     tag.className = 'tag';
     tag.textContent = item.theater || '';
 
+    const reclinerTag = document.createElement('span');
+    reclinerTag.className = 'tag';
+    reclinerTag.textContent = '리클라이너';
+
     // 가격은 12,000원처럼 쉼표를 넣어 보여 준다
     const priceLabel = document.createElement('span');
     priceLabel.className = 'price';
@@ -338,11 +343,21 @@ function render() {
     const info = document.createElement('div');
     info.className = 'row-info';
     if (item.theater) info.append(tag);
+    if (item.recliner) info.append(reclinerTag);
     info.append(priceLabel);
     if (item.showDate) info.append(dueLabel);
     info.append(linkPart, ...linkEdit);
     if (imageButton) info.append(imageButton);
     li.append(main, info);
+
+    // 링크가 있는 줄은 버튼·체크·링크 글자가 아닌 곳을 누르면 링크가 새 창으로 열린다
+    if (item.link_url && isWebAddress(item.link_url)) {
+      li.classList.add('has-link');
+      li.addEventListener('click', (event) => {
+        if (event.target.closest('button, input, a')) return;
+        window.open(item.link_url, '_blank', 'noopener,noreferrer');
+      });
+    }
 
     // 이미지가 있으면 줄 아래에 작은 미리보기 (누르면 크게 열린다)
     if (item.image_url && isWebAddress(item.image_url)) {
@@ -386,11 +401,21 @@ document.querySelector('#theme').addEventListener('click', () => {
   applyTheme();
 });
 
+// 가격을 500원씩 올리고 내린다 (0원 아래로는 안 내려간다, 빈 칸은 0원으로 본다)
+function changePrice(amount) {
+  const price = document.querySelector('#price');
+  price.value = Math.max(0, (Number(price.value) || 0) + amount);
+}
+document.querySelector('#price-plus').addEventListener('click', () => changePrice(500));
+document.querySelector('#price-minus').addEventListener('click', () => changePrice(-500));
+
 const button = document.querySelector('#add');
 button.addEventListener('click', () => {
   const movie = document.querySelector('#movie');
   const price = document.querySelector('#price');
   const showDate = document.querySelector('#show-date');
+  const recliner = document.querySelector('#recliner');
+  const link = document.querySelector('#link');
   const title = movie.value.trim();
   const won = Number(price.value);
   if (title === '' || price.value.trim() === '') return;      // 영화제목이나 가격이 비면 멈춘다
@@ -398,10 +423,17 @@ button.addEventListener('click', () => {
     alert('가격은 0 이상의 숫자로 적어 주세요.');
     return;
   }
-  addItem(title, document.querySelector('#theater').value, won, showDate.value);
+  const address = link.value.trim();
+  if (address !== '' && !isWebAddress(address)) {              // 링크는 http:// 또는 https://로 시작해야 한다
+    alert('링크는 http:// 또는 https://로 시작하는 주소만 넣을 수 있어요.');
+    return;
+  }
+  addItem(title, document.querySelector('#theater').value, won, recliner.checked, address, showDate.value);
   movie.value = '';
   price.value = '';
   showDate.value = '';
+  recliner.checked = false;
+  link.value = '';
   movie.focus();
 });
 

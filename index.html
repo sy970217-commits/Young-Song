@@ -18,7 +18,13 @@
     <option>메가박스 제주아라</option>
     <option>메가박스 제주삼화</option>
   </select>
-  <input id="price" type="number" min="0" step="1" inputmode="numeric" placeholder="가격 (원)">
+  <div class="price-row">
+    <button id="price-minus" type="button" aria-label="가격 500원 내리기">−500</button>
+    <input id="price" type="number" min="0" step="1" inputmode="numeric" placeholder="가격 (원)">
+    <button id="price-plus" type="button" aria-label="가격 500원 올리기">+500</button>
+  </div>
+  <label class="check-row"><input id="recliner" type="checkbox"> 리클라이너</label>
+  <input id="link" type="url" inputmode="url" placeholder="링크 주소 (안 넣어도 됨)">
   <input id="show-date" type="date" aria-label="상영일">
   <button id="add" type="button">추가</button>
   <button id="toggle-done" type="button">판매 완료한 것 숨기기</button>
