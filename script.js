@@ -494,11 +494,26 @@ document.querySelector('#toggle-done').addEventListener('click', () => {
   render();
 });
 
-// 로그인 상태에 따라 화면을 바꾼다 (로그인 칸 / 내 이메일·로그아웃 / 추가 입력 칸)
+let formOpen = false;  // 등록 사항 입력 칸이 펼쳐져 있는지 (처음에는 접혀 있다)
+
+// '넘기기' 버튼과 등록 사항 입력 칸을 상태에 맞게 보이거나 숨긴다
+function showForm() {
+  document.querySelector('#open-form').hidden = !session;
+  document.querySelector('#open-form').textContent = formOpen ? '닫기' : '넘기기';
+  document.querySelector('#add-form').hidden = !(session && formOpen);
+}
+
+// 상영시간 칸이 비어 있을 때만 '상영시간' 안내 글을 보여 준다
+function updateTimeHint() {
+  document.querySelector('.time-field').classList.toggle('filled', document.querySelector('#show-time').value !== '');
+}
+
+// 로그인 상태에 따라 화면을 바꾼다 (로그인 칸 / 내 이메일·로그아웃 / 넘기기 버튼)
 function applyAuth() {
   document.querySelector('#auth-out').hidden = Boolean(session);
   document.querySelector('#auth-in').hidden = !session;
-  document.querySelector('#add-form').hidden = !session;
+  if (!session) formOpen = false;
+  showForm();
   document.querySelector('#who').textContent = session ? session.email : '';
   render();
 }
@@ -556,6 +571,12 @@ async function logOut() {
 document.querySelector('#login').addEventListener('click', logIn);
 document.querySelector('#signup').addEventListener('click', signUp);
 document.querySelector('#logout').addEventListener('click', logOut);
+document.querySelector('#open-form').addEventListener('click', () => {
+  formOpen = !formOpen;
+  showForm();
+});
+document.querySelector('#show-time').addEventListener('input', updateTimeHint);
+document.querySelector('#show-time').addEventListener('change', updateTimeHint);
 document.querySelector('#password').addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !event.isComposing) logIn();
 });
@@ -607,6 +628,9 @@ button.addEventListener('click', () => {
   movie.value = '';
   price.value = '';
   showTime.value = '';
+  updateTimeHint();
+  formOpen = false;  // 추가하면 등록 사항은 다시 접는다
+  showForm();
   recliner.checked = false;
   link.value = '';
   phone.value = '';

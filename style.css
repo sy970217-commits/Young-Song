@@ -162,16 +162,6 @@ body.dark #list li button.star.on { color: #facc15; }
 
 body.dark li.done { color: #6b7280; }
 
-/* 제목 위 사진: 휴대폰 폭에 맞게 줄이고 모서리는 둥글게 */
-#photo {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  height: auto;
-  margin-bottom: 16px;
-  border-radius: 16px;
-}
-
 /* 링크·이미지: 작은 버튼, 주소 링크, 줄 아래 미리보기 */
 #list li button.attach {
   margin-left: 0;
@@ -305,3 +295,50 @@ body.dark #login {
 }
 
 #list li button.star:disabled { cursor: default; }
+
+/* 넘기기 버튼 */
+#open-form {
+  width: 100%;
+  margin-bottom: 16px;
+  font-size: 16px;
+  color: #ffffff;
+  background: #0f766e;
+  border: none;
+}
+
+body.dark #open-form {
+  color: #04120f;
+  background: #14b8a6;
+}
+
+/* 상영시간 칸이 비어 있을 때 보이는 안내 글 (칸을 누르거나 시간을 고르면 사라진다) */
+.time-field {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.time-field #show-time { margin-bottom: 0; }
+
+.time-hint {
+  position: absolute;
+  top: 1px;
+  right: 48px;
+  bottom: 1px;
+  left: 1px;
+  display: flex;
+  align-items: center;
+  padding-left: 11px;
+  font-size: 16px;
+  color: #757575;
+  background: #ffffff;
+  border-radius: 7px 0 0 7px;
+  pointer-events: none;
+}
+
+.time-field.filled .time-hint,
+.time-field:focus-within .time-hint { display: none; }
+
+body.dark .time-hint {
+  color: #9ca3af;
+  background: #12181d;
+}

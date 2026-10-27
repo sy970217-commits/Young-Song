@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>양도권 등록</title>
+  <title>양도권 넘기기</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <img id="photo" src="https://sijsxqhlaxtlmxdkmhuk.supabase.co/storage/v1/object/public/photos/todo-logo-raw.png" alt="로고">
-  <h1>양도권 등록</h1>
+  <h1>양도권 넘기기</h1>
   <button id="theme" type="button">어두운 화면</button>
   <div id="auth-out">
     <input id="email" type="email" placeholder="이메일" autocomplete="email">
@@ -22,6 +21,7 @@
     <span id="who"></span>
     <button id="logout" type="button">로그아웃</button>
   </div>
+  <button id="open-form" type="button" hidden>넘기기</button>
   <div id="add-form" hidden>
     <input id="movie" placeholder="영화제목">
     <select id="theater" aria-label="극장">
@@ -41,7 +41,10 @@
     <label class="check-row"><input id="recliner" type="checkbox"> 리클라이너</label>
     <input id="link" type="url" inputmode="url" placeholder="당근 링크 (링크나 전화번호 중 하나는 꼭)">
     <input id="phone" type="tel" inputmode="tel" placeholder="전화번호 (예: 010-1234-5678)">
-    <input id="show-time" type="time" aria-label="상영시간">
+    <div class="time-field">
+      <input id="show-time" type="time" aria-label="상영시간">
+      <span class="time-hint">상영시간</span>
+    </div>
     <button id="add" type="button">추가</button>
   </div>
   <button id="toggle-done" type="button">판매 완료한 것 숨기기</button>
