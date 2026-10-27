@@ -15,7 +15,8 @@ h1 { font-size: 28px; color: #0f766e; }
 #password,
 #movie,
 #price,
-#link {
+#link,
+#phone {
   width: 100%;
   box-sizing: border-box;
   padding: 12px;
@@ -129,6 +130,7 @@ body.dark #password,
 body.dark #movie,
 body.dark #price,
 body.dark #link,
+body.dark #phone,
 body.dark #theater,
 body.dark #show-time {
   color: #e5e7eb;
@@ -177,6 +179,12 @@ body.dark li.done { color: #6b7280; }
   font-size: 12px;
 }
 
+.phone-link {
+  font-size: 12px;
+  color: #0f766e;
+  white-space: nowrap;
+}
+
 .file-link {
   max-width: 64px;
   overflow: hidden;
@@ -204,7 +212,8 @@ body.dark li.done { color: #6b7280; }
   border-radius: 8px;
 }
 
-body.dark .file-link { color: #2dd4bf; }
+body.dark .file-link,
+body.dark .phone-link { color: #2dd4bf; }
 
 /* 가격 칸과 −500·+500 버튼, 리클라이너 체크 칸 */
 .price-row {

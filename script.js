@@ -119,6 +119,22 @@ function isWebAddress(text) {
   return /^https?:\/\//i.test(text);
 }
 
+// 당근 링크: http:// 또는 https://로 시작하고 주소에 daangn이 들어간 것 (daangn.com, daangn.app.link 등)
+function isDaangnLink(text) {
+  if (!isWebAddress(text)) return false;
+  try {
+    return new URL(text).hostname.includes('daangn');
+  } catch (error) {
+    return false;
+  }
+}
+
+// 전화번호: 숫자와 -만, 숫자는 9~11자리
+function isPhoneNumber(text) {
+  const digits = text.replace(/-/g, '');
+  return /^[0-9-]+$/.test(text) && digits.length >= 9 && digits.length <= 11;
+}
+
 function showError() {
   alert('표에 저장하지 못했어요. 인터넷 연결을 확인하고 다시 해 보세요.');
 }
@@ -134,6 +150,7 @@ async function loadItems() {
       theater: row.theater,
       price: row.price,
       recliner: row.recliner,
+      phone: row.phone,
       showTime: row.show_time ? row.show_time.slice(0, 5) : null,  // 19:50:00 -> 19:50
       sold: row.sold,
       star: row.star,
@@ -265,14 +282,14 @@ picker.addEventListener('change', () => {
   if (file && pickingItem) addImage(pickingItem, file);
 });
 
-async function addItem(movie, theater, price, recliner, link, showTime) {
+async function addItem(movie, theater, price, recliner, link, phone, showTime) {
   try {
     const rows = await api('', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, show_time: showTime || null, sold: false, star: false }),
+      body: JSON.stringify({ movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, show_time: showTime || null, sold: false, star: false }),
     });
-    items.push({ id: rows[0].id, user_id: session.user_id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, showTime: showTime || null, sold: false, star: false });  // 목록 맨 아래에
+    items.push({ id: rows[0].id, user_id: session.user_id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, showTime: showTime || null, sold: false, star: false });  // 목록 맨 아래에
   } catch (error) {
     showError();
   }
@@ -418,6 +435,13 @@ function render() {
 
     const info = document.createElement('div');
     info.className = 'row-info';
+    if (item.phone && /^[0-9-]+$/.test(item.phone)) {
+      const phoneLink = document.createElement('a');
+      phoneLink.className = 'phone-link';
+      phoneLink.href = 'tel:' + item.phone.replace(/-/g, '');
+      phoneLink.textContent = '전화 ' + item.phone;
+      info.append(phoneLink);
+    }
     if (linkPart) info.append(linkPart, ...linkEdit);
     if (imageButton) info.append(imageButton);
     li.append(main);
@@ -557,6 +581,7 @@ button.addEventListener('click', () => {
   const showTime = document.querySelector('#show-time');
   const recliner = document.querySelector('#recliner');
   const link = document.querySelector('#link');
+  const phone = document.querySelector('#phone');
   const title = movie.value.trim();
   const won = Number(price.value);
   if (title === '' || price.value.trim() === '') return;      // 영화제목이나 가격이 비면 멈춘다
@@ -565,16 +590,26 @@ button.addEventListener('click', () => {
     return;
   }
   const address = link.value.trim();
-  if (address !== '' && !isWebAddress(address)) {              // 링크는 http:// 또는 https://로 시작해야 한다
-    alert('링크는 http:// 또는 https://로 시작하는 주소만 넣을 수 있어요.');
+  const number = phone.value.trim();
+  if (address === '' && number === '') {                       // 당근 링크나 전화번호 중 하나는 꼭 있어야 한다
+    alert('당근 링크나 전화번호 중 하나는 꼭 적어 주세요.');
     return;
   }
-  addItem(title, document.querySelector('#theater').value, won, recliner.checked, address, showTime.value);
+  if (address !== '' && !isDaangnLink(address)) {
+    alert('당근 링크만 넣을 수 있어요. http:// 또는 https://로 시작하고 daangn이 들어간 주소를 적어 주세요.');
+    return;
+  }
+  if (number !== '' && !isPhoneNumber(number)) {
+    alert('전화번호는 숫자와 -만, 숫자 9~11자리로 적어 주세요. (예: 010-1234-5678)');
+    return;
+  }
+  addItem(title, document.querySelector('#theater').value, won, recliner.checked, address, number, showTime.value);
   movie.value = '';
   price.value = '';
   showTime.value = '';
   recliner.checked = false;
   link.value = '';
+  phone.value = '';
   movie.focus();
 });
 
