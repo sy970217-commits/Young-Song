@@ -3,25 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>할 일 목록</title>
+  <title>양도권 등록</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <img id="photo" src="https://sijsxqhlaxtlmxdkmhuk.supabase.co/storage/v1/object/public/photos/todo-logo-raw.png" alt="할 일 목록 사진">
-  <h1>할 일 목록 (이번 주 장볼 것)</h1>
+  <img id="photo" src="https://sijsxqhlaxtlmxdkmhuk.supabase.co/storage/v1/object/public/photos/todo-logo-raw.png" alt="로고">
+  <h1>양도권 등록</h1>
   <button id="theme" type="button">어두운 화면</button>
-  <input id="item" placeholder="살 것 적기">
-  <select id="category">
-    <option>장보기</option>
-    <option>업무</option>
-    <option>집안일</option>
-    <option>기타</option>
+  <input id="movie" placeholder="영화제목">
+  <select id="theater" aria-label="극장">
+    <option>CGV 제주</option>
+    <option>롯데시네마 제주연동</option>
+    <option>롯데시네마 서귀포</option>
+    <option>메가박스 제주아라</option>
+    <option>메가박스 제주삼화</option>
   </select>
-  <input id="due" type="date" aria-label="마감일">
+  <input id="price" type="number" min="0" step="1" inputmode="numeric" placeholder="가격 (원)">
+  <input id="show-date" type="date" aria-label="상영일">
   <button id="add" type="button">추가</button>
-  <button id="toggle-done" type="button">완료한 것 숨기기</button>
+  <button id="toggle-done" type="button">판매 완료한 것 숨기기</button>
   <ul id="list"></ul>
-  <p>남은 개수: <span id="count">0</span></p>
+  <p>판매 중: <span id="count">0</span>개</p>
   <script src="script.js"></script>
 </body>
 </html>
