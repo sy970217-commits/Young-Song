@@ -25,9 +25,15 @@ function saveSession(data) {
     refresh_token: data.refresh_token,
     expires_at: Date.now() + (data.expires_in || 3600) * 1000,
     user_id: data.user.id,
-    email: data.user.email,
+    name: userName(data.user),
   };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+// 화면에 보여 줄 내 이름: 이메일이 있으면 이메일, 없으면 카카오 닉네임
+function userName(user) {
+  const info = user.user_metadata || {};
+  return user.email || info.name || info.nickname || info.preferred_username || '카카오 사용자';
 }
 
 function clearSession() {
@@ -35,7 +41,7 @@ function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
-// 로그인·가입·로그아웃 요청을 Supabase에 보낸다
+// 로그인 열쇠 새로 받기·로그아웃 요청을 Supabase에 보낸다
 async function authRequest(path, body, token) {
   const headers = { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' };
   if (token) headers.Authorization = 'Bearer ' + token;
@@ -445,54 +451,44 @@ document.querySelector('#toggle-done').addEventListener('click', () => {
   render();
 });
 
-// 로그인 상태에 따라 화면을 바꾼다 (로그인 칸 / 내 이메일·로그아웃 / 추가 입력 칸)
+// 로그인 상태에 따라 화면을 바꾼다 (카카오 로그인 버튼 / 내 이름·로그아웃 / 추가 입력 칸)
 function applyAuth() {
   document.querySelector('#auth-out').hidden = Boolean(session);
   document.querySelector('#auth-in').hidden = !session;
   document.querySelector('#add-form').hidden = !session;
-  document.querySelector('#who').textContent = session ? session.email : '';
+  document.querySelector('#who').textContent = session ? (session.name || session.email) : '';
   render();
 }
 
-function authFields() {
-  return { email: document.querySelector('#email').value.trim(), password: document.querySelector('#password').value };
+// 카카오 로그인: 카카오 창으로 보냈다가, 돌아오면 주소 끝(#)에 로그인 열쇠가 붙어 있다
+function kakaoLogin() {
+  const back = encodeURIComponent(location.origin + location.pathname);
+  location.href = SUPABASE_URL + '/auth/v1/authorize?provider=kakao&redirect_to=' + back;
 }
 
-async function logIn() {
-  const { email, password } = authFields();
-  if (email === '' || password === '') {
-    alert('이메일과 비밀번호를 적어 주세요.');
+// 카카오 로그인에서 돌아왔으면 열쇠를 꺼내 로그인 정보를 저장한다
+async function finishKakaoLogin() {
+  const params = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
+  const token = params.get('access_token');
+  if (!token && !params.get('error')) return;
+  history.replaceState(null, '', location.pathname);  // 주소에서 열쇠를 지운다
+  if (!token) {
+    alert('카카오 로그인에 실패했어요. 다시 해 보세요.');
     return;
   }
   try {
-    saveSession(await authRequest('/token?grant_type=password', { email: email, password: password }));
+    const response = await fetch(SUPABASE_URL + '/auth/v1/user', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token },
+    });
+    if (!response.ok) throw new Error('Auth ' + response.status);
+    saveSession({
+      access_token: token,
+      refresh_token: params.get('refresh_token'),
+      expires_in: Number(params.get('expires_in')) || 3600,
+      user: await response.json(),
+    });
   } catch (error) {
-    alert('로그인하지 못했어요. 이메일과 비밀번호를 확인해 주세요. (가입 직후라면 메일 인증이 필요할 수 있어요)');
-    return;
-  }
-  document.querySelector('#password').value = '';
-  applyAuth();
-  await loadItems();
-}
-
-async function signUp() {
-  const { email, password } = authFields();
-  if (email === '' || password.length < 6) {
-    alert('이메일을 적고, 비밀번호는 6자 이상으로 적어 주세요.');
-    return;
-  }
-  try {
-    const data = await authRequest('/signup', { email: email, password: password });
-    if (data && data.access_token) {
-      saveSession(data);  // 메일 인증이 꺼져 있으면 가입과 함께 로그인된다
-      document.querySelector('#password').value = '';
-      applyAuth();
-      await loadItems();
-    } else {
-      alert('가입했어요. 메일로 인증 링크를 보냈으면 링크를 누른 뒤 로그인해 주세요.');
-    }
-  } catch (error) {
-    alert('가입하지 못했어요. 이미 가입한 이메일이거나 비밀번호가 너무 짧을 수 있어요.');
+    alert('카카오 로그인에 실패했어요. 다시 해 보세요.');
   }
 }
 
@@ -504,12 +500,8 @@ async function logOut() {
   applyAuth();
 }
 
-document.querySelector('#login').addEventListener('click', logIn);
-document.querySelector('#signup').addEventListener('click', signUp);
+document.querySelector('#kakao-login').addEventListener('click', kakaoLogin);
 document.querySelector('#logout').addEventListener('click', logOut);
-document.querySelector('#password').addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' && !event.isComposing) logIn();
-});
 
 document.querySelector('#theme').addEventListener('click', () => {
   dark = !dark;
@@ -558,6 +550,10 @@ document.querySelector('#movie').addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !event.isComposing) button.click();
 });
 
-applyTheme();
-applyAuth();
-loadItems();
+async function start() {
+  applyTheme();
+  await finishKakaoLogin();
+  applyAuth();
+  await loadItems();
+}
+start();

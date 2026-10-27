@@ -11,8 +11,6 @@ body {
 
 h1 { font-size: 28px; color: #0f766e; }
 
-#email,
-#password,
 #movie,
 #price,
 #link {
@@ -124,8 +122,6 @@ body.dark {
 
 body.dark h1 { color: #2dd4bf; }
 
-body.dark #email,
-body.dark #password,
 body.dark #movie,
 body.dark #price,
 body.dark #link,
@@ -143,7 +139,6 @@ body.dark #add {
 
 body.dark #toggle-done,
 body.dark #theme,
-body.dark #signup,
 body.dark #logout,
 body.dark #price-minus,
 body.dark #price-plus,
@@ -246,25 +241,16 @@ body.dark .file-link { color: #2dd4bf; }
 /* 로그인 */
 [hidden] { display: none !important; }
 
-.auth-buttons {
-  display: flex;
-  gap: 8px;
+#kakao-login {
+  width: 100%;
   margin-bottom: 16px;
-}
-
-#login,
-#signup {
-  flex: 1;
   font-size: 16px;
-}
-
-#login {
-  color: #ffffff;
-  background: #0f766e;
+  font-weight: bold;
+  color: rgba(0, 0, 0, 0.85);
+  background: #fee500;
   border: none;
 }
 
-#signup,
 #logout {
   color: #0f766e;
   background: #ffffff;
@@ -288,11 +274,6 @@ body.dark .file-link { color: #2dd4bf; }
 #logout {
   padding: 8px 12px;
   font-size: 14px;
-}
-
-body.dark #login {
-  color: #04120f;
-  background: #14b8a6;
 }
 
 #list li button.star:disabled { cursor: default; }
