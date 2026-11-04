@@ -113,6 +113,8 @@ async function api(query, options = {}) {
 
 const IMAGE_BUCKET = 'images';          // 이미지를 올리는 Supabase 저장소 이름
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;  // 5MB
+const MAX_PRICE = 16000;                 // 정가 이하만 올릴 수 있다 (영화 정가 16,000원 이하)
+const STATUSES = ['판매 중', '예약 중', '판매 완료'];  // 판매 상태가 바뀌는 순서
 
 // http:// 또는 https://로 시작하는 주소만 링크로 쓴다
 function isWebAddress(text) {
@@ -151,7 +153,9 @@ async function loadItems() {
       price: row.price,
       recliner: row.recliner,
       phone: row.phone,
+      showDate: row.show_date,
       showTime: row.show_time ? row.show_time.slice(0, 5) : null,  // 19:50:00 -> 19:50
+      status: STATUSES.includes(row.status) ? row.status : '판매 중',
       link_url: row.link_url,
       image_url: row.image_url,
     }));
@@ -248,14 +252,14 @@ picker.addEventListener('change', () => {
   if (file && pickingItem) addImage(pickingItem, file);
 });
 
-async function addItem(movie, theater, price, recliner, link, phone, showTime) {
+async function addItem(movie, theater, price, recliner, link, phone, showDate, showTime) {
   try {
     const rows = await api('', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, show_time: showTime || null }),
+      body: JSON.stringify({ movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, show_date: showDate, show_time: showTime || null }),
     });
-    items.push({ id: rows[0].id, user_id: session.user_id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, showTime: showTime || null });  // 목록 맨 아래에
+    items.push({ id: rows[0].id, user_id: session.user_id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, showDate: showDate, showTime: showTime || null, status: '판매 중' });
   } catch (error) {
     showError();
   }
@@ -273,19 +277,74 @@ function smallButton(text, label, onClick) {
   return button;
 }
 
+// 'YYYY-MM-DD' 모양의 날짜 글 (이 기기의 시간 기준)
+function dateText(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+}
+
+// 상영 시각. 상영시간을 안 골랐으면 그날이 끝나는 시각(23:59)으로 본다. 상영일이 없는 옛 글은 null
+function showMoment(item) {
+  if (!item.showDate) return null;
+  return new Date(item.showDate + 'T' + (item.showTime || '23:59') + ':00');
+}
+
+// 상영일을 오늘·내일·11/7처럼 보여 준다
+function dayLabel(showDate) {
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  if (showDate === dateText(now)) return '오늘';
+  if (showDate === dateText(tomorrow)) return '내일';
+  const [, month, day] = showDate.split('-');
+  return Number(month) + '/' + Number(day);
+}
+
+// 판매 상태를 판매 중 → 예약 중 → 판매 완료 → 판매 중 순서로 바꾸고 저장한다
+async function nextStatus(item) {
+  const before = item.status;
+  item.status = STATUSES[(STATUSES.indexOf(before) + 1) % STATUSES.length];
+  render();
+  try {
+    await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ status: item.status }) });
+  } catch (error) {
+    item.status = before;  // 저장 실패하면 원래대로
+    showError();
+    render();
+  }
+}
+
 function render() {
   const list = document.querySelector('#list');
   list.innerHTML = '';
-  items.forEach((item) => {
+  // 상영이 지난 글은 숨기고, 상영이 가까운 순으로 정렬한다 (판매 완료는 맨 아래, 같으면 추가한 순서)
+  const now = new Date();
+  const shown = items.filter((item) => {
+    const moment = showMoment(item);
+    return !moment || moment >= now;
+  });
+  shown.sort((a, b) => {
+    const soldA = a.status === '판매 완료';
+    const soldB = b.status === '판매 완료';
+    if (soldA !== soldB) return soldA ? 1 : -1;
+    const momentA = showMoment(a);
+    const momentB = showMoment(b);
+    if (momentA && momentB) return momentA - momentB;
+    if (momentA) return -1;
+    if (momentB) return 1;
+    return 0;
+  });
+  shown.forEach((item) => {
     const li = document.createElement('li');
+    if (item.status === '판매 완료') li.classList.add('sold');
     const mine = canEdit(item);  // 내가 쓴 글만 지울 수 있다
 
     const label = document.createElement('span');
     label.className = 'label';
-    // 영화 극장 상영시간 가격 리클라이너 순서의 한 줄 (예: 킬링타임 메가박스 제주아라 19:50 3000원 리클라이너)
+    // 영화 극장 상영일 상영시간 가격 리클라이너 순서의 한 줄 (예: 킬링타임 메가박스 제주아라 오늘 19:50 3000원 리클라이너)
     label.textContent = [
       item.movie,
       item.theater,
+      item.showDate ? dayLabel(item.showDate) : '',
       item.showTime,
       Number(item.price || 0) + '원',
       item.recliner ? '리클라이너' : '',
@@ -329,6 +388,18 @@ function render() {
 
     const info = document.createElement('div');
     info.className = 'row-info';
+    // 판매 상태: 내 글은 누르면 바뀌는 버튼, 남의 글은 글자
+    const statusClass = item.status === '예약 중' ? ' reserved' : item.status === '판매 완료' ? ' sold' : '';
+    if (mine) {
+      const statusButton = smallButton(item.status, '판매 상태 바꾸기', () => nextStatus(item));
+      statusButton.classList.add('status-button');
+      info.append(statusButton);
+    } else {
+      const statusText = document.createElement('span');
+      statusText.className = 'status' + statusClass;
+      statusText.textContent = item.status;
+      info.append(statusText);
+    }
     if (item.phone && /^[0-9-]+$/.test(item.phone)) {
       const phoneText = document.createElement('span');
       phoneText.className = 'phone-text';
@@ -377,7 +448,7 @@ function render() {
     }
     list.append(li);
   });
-  document.querySelector('#count').textContent = items.length;  // 판매 중인 개수 = 목록에 있는 양도권 수
+  document.querySelector('#count').textContent = shown.filter((item) => item.status === '판매 중').length;  // 판매 중인 개수
 }
 
 let formOpen = false;  // 등록 사항 입력 칸이 펼쳐져 있는지 (처음에는 접혀 있다)
@@ -473,10 +544,10 @@ document.querySelector('#theme').addEventListener('click', () => {
   applyTheme();
 });
 
-// 가격을 500원씩 올리고 내린다 (0원 아래로는 안 내려간다, 빈 칸은 0원으로 본다)
+// 가격을 500원씩 올리고 내린다 (0원 아래로, 16,000원 위로는 안 간다, 빈 칸은 0원으로 본다)
 function changePrice(amount) {
   const price = document.querySelector('#price');
-  price.value = Math.max(0, (Number(price.value) || 0) + amount);
+  price.value = Math.min(MAX_PRICE, Math.max(0, (Number(price.value) || 0) + amount));
 }
 document.querySelector('#price-plus').addEventListener('click', () => changePrice(500));
 document.querySelector('#price-minus').addEventListener('click', () => changePrice(-500));
@@ -485,6 +556,7 @@ const button = document.querySelector('#add');
 button.addEventListener('click', () => {
   const movie = document.querySelector('#movie');
   const price = document.querySelector('#price');
+  const showDate = document.querySelector('#show-date');
   const showTime = document.querySelector('#show-time');
   const recliner = document.querySelector('#recliner');
   const link = document.querySelector('#link');
@@ -494,6 +566,18 @@ button.addEventListener('click', () => {
   if (title === '' || price.value.trim() === '') return;      // 영화제목이나 가격이 비면 멈춘다
   if (!Number.isInteger(won) || won < 0) {                    // 가격은 0 이상의 정수만
     alert('가격은 0 이상의 숫자로 적어 주세요.');
+    return;
+  }
+  if (won > MAX_PRICE) {                                      // 정가를 넘는 웃돈은 올릴 수 없다
+    alert('정가를 넘는 가격은 올릴 수 없어요. ' + MAX_PRICE.toLocaleString('ko-KR') + '원 이하로 적어 주세요.');
+    return;
+  }
+  if (showDate.value === '') {                                // 상영일은 꼭 골라야 한다
+    alert('상영일을 골라 주세요.');
+    return;
+  }
+  if (new Date(showDate.value + 'T' + (showTime.value || '23:59') + ':00') < new Date()) {
+    alert('이미 지난 상영은 올릴 수 없어요.');
     return;
   }
   const address = link.value.trim();
@@ -510,9 +594,10 @@ button.addEventListener('click', () => {
     alert('전화번호는 숫자와 -만, 숫자 9~11자리로 적어 주세요. (예: 010-1234-5678)');
     return;
   }
-  addItem(title, document.querySelector('#theater').value, won, recliner.checked, address, number, showTime.value);
+  addItem(title, document.querySelector('#theater').value, won, recliner.checked, address, number, showDate.value, showTime.value);
   movie.value = '';
   price.value = '';
+  showDate.value = '';
   showTime.value = '';
   updateTimeHint();
   formOpen = false;  // 추가하면 등록 사항은 다시 접는다
@@ -531,3 +616,4 @@ document.querySelector('#movie').addEventListener('keydown', (event) => {
 applyTheme();
 applyAuth();
 loadItems();
+setInterval(render, 60 * 1000);  // 1분마다 다시 그려서 상영이 지난 글을 숨긴다

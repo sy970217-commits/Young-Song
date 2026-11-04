@@ -25,6 +25,7 @@ body {
 }
 
 #theater,
+#show-date,
 #show-time {
   width: 100%;
   box-sizing: border-box;
@@ -109,6 +110,7 @@ body.dark #price,
 body.dark #link,
 body.dark #phone,
 body.dark #theater,
+body.dark #show-date,
 body.dark #show-time {
   color: #e5e7eb;
   background: #12181d;
@@ -164,7 +166,8 @@ body.dark #list li { border-bottom-color: #1f2933; }
   border-radius: 8px;
 }
 
-body.dark .phone-text { color: #2dd4bf; }
+body.dark .phone-text,
+body.dark .status { color: #2dd4bf; }
 
 /* 가격 칸과 −500·+500 버튼, 리클라이너 체크 칸 */
 .price-row {
@@ -301,3 +304,18 @@ body.dark .time-hint {
   color: #9ca3af;
   background: #12181d;
 }
+
+/* 판매 상태: 판매 중·예약 중·판매 완료 */
+.status {
+  font-size: 12px;
+  color: #0f766e;
+  white-space: nowrap;
+}
+
+.status.reserved { font-weight: bold; }
+
+body.dark .status.sold,
+.status.sold { color: #6b7280; }
+
+#list li.sold .label { color: #9ca3af; }
+body.dark #list li.sold .label { color: #6b7280; }
