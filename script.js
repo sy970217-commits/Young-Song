@@ -122,7 +122,15 @@ async function api(query, options = {}) {
     applyAuth();
     alert('로그인이 풀렸어요. 다시 로그인해 주세요.');
   }
-  if (!response.ok) throw new Error('Supabase ' + response.status);
+  if (!response.ok) {
+    // 실패하면 Supabase가 알려 준 이유(code·메시지)를 담아서 던진다
+    const reason = await response.json().catch(() => ({}));
+    const error = new Error('Supabase ' + response.status);
+    error.status = response.status;
+    error.code = reason.code || '';
+    error.detail = reason.message || '';
+    throw error;
+  }
   return response.status === 204 ? null : response.json();
 }
 
@@ -152,8 +160,20 @@ function isPhoneNumber(text) {
   return /^[0-9-]+$/.test(text) && digits.length >= 9 && digits.length <= 11;
 }
 
-function showError() {
-  alert('표에 저장하지 못했어요. 인터넷 연결을 확인하고 다시 해 보세요.');
+// 표에 저장·읽기가 실패한 이유를 쉬운 말로 알려 준다 (맨 끝에 Supabase가 보낸 원인도 붙인다)
+function showError(error) {
+  if (error && error.status === 401) return;  // 로그인이 풀린 경우는 이미 따로 알렸다
+  const code = (error && error.code) || '';
+  let hint;
+  if (!error || !error.status) hint = '인터넷에 연결되지 않았거나 Supabase에 닿지 않아요.';
+  else if (code === '42P01' || code === 'PGRST205') hint = 'tickets 표가 없어요. 안내한 SQL을 Supabase의 SQL Editor에서 실행해 주세요.';
+  else if (code === 'PGRST204' || code === '42703') hint = '표에 필요한 칸이 없어요. 안내한 SQL(칸 추가)을 Supabase의 SQL Editor에서 실행해 주세요.';
+  else if (code === '42501' || error.status === 403) hint = '권한이 없어요. 로그인했는지, 안내한 SQL로 권한 규칙(RLS)을 만들었는지 확인해 주세요.';
+  else if (code === '23514') hint = '표의 규칙에 맞지 않는 값이에요. (예: 가격이 16,000원을 넘음)';
+  else if (code === '23502') hint = '꼭 필요한 칸이 비어 있어요.';
+  else hint = '이유를 알 수 없어요.';
+  const server = error && error.status ? '\n(Supabase 답: ' + error.status + ' ' + code + ' ' + (error.detail || '') + ')' : '';
+  alert('표에 저장하지 못했어요. ' + hint + server);
 }
 
 // 페이지를 열 때 표에서 목록을 읽어 온다
@@ -175,7 +195,7 @@ async function loadItems() {
       image_url: row.image_url,
     }));
   } catch (error) {
-    showError();
+    showError(error);
   }
   render();
 }
@@ -213,7 +233,7 @@ async function removeImage(item) {
     await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ image_url: null }) });
     item.image_url = null;
   } catch (error) {
-    showError();
+    showError(error);
     render();
     return;
   }
@@ -240,7 +260,14 @@ async function addImage(item, file) {
       headers: { ...(await authHeaders()), 'Content-Type': file.type },
       body: file,
     });
-    if (!upload.ok) throw new Error('Storage ' + upload.status);
+    if (!upload.ok) {
+      const reason = await upload.json().catch(() => ({}));
+      const error = new Error('Storage ' + upload.status);
+      error.status = upload.status;
+      error.code = reason.error || reason.code || '';
+      error.detail = reason.message || '';
+      throw error;
+    }
     const imageUrl = SUPABASE_URL + '/storage/v1/object/public/' + IMAGE_BUCKET + '/' + key;
     await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ image_url: imageUrl }) });
     const oldUrl = item.image_url;  // 바꾸는 경우 옛 파일은 저장소에서 지운다
@@ -249,7 +276,7 @@ async function addImage(item, file) {
     if (oldUrl) await deleteStoredImage(oldUrl);
     return;
   } catch (error) {
-    showError();
+    showError(error);
   }
   render();
 }
@@ -276,7 +303,7 @@ async function addItem(movie, theater, price, recliner, link, phone, showDate, s
     });
     items.push({ id: rows[0].id, user_id: session.user_id, movie: movie, theater: theater, price: price, recliner: recliner, link_url: link || null, phone: phone || null, showDate: showDate, showTime: showTime || null, status: '판매 중' });
   } catch (error) {
-    showError();
+    showError(error);
   }
   render();
 }
@@ -339,7 +366,7 @@ async function nextStatus(item) {
     await api('?id=eq.' + item.id, { method: 'PATCH', body: JSON.stringify({ status: item.status }) });
   } catch (error) {
     item.status = before;  // 저장 실패하면 원래대로
-    showError();
+    showError(error);
     render();
   }
 }
@@ -403,7 +430,7 @@ function render() {
         await api('?id=eq.' + item.id, { method: 'DELETE' });
         items.splice(items.indexOf(item), 1);
       } catch (error) {
-        showError();
+        showError(error);
         render();
         return;
       }
