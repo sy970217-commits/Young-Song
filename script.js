@@ -277,24 +277,35 @@ function smallButton(text, label, onClick) {
   return button;
 }
 
-// 'YYYY-MM-DD' 모양의 날짜 글 (이 기기의 시간 기준)
-function dateText(date) {
-  const pad = (n) => String(n).padStart(2, '0');
-  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+// 날짜와 시각은 모두 한국 시간(서울) 기준이다. 쓰는 기기의 시간대와 상관없다
+const SEOUL = 'Asia/Seoul';
+
+// 한국 시간의 지금: { date: '2026-11-05', hour: 19, minute: 50 }
+function seoulNow() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SEOUL, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((part) => part.type === type).value;
+  return { date: get('year') + '-' + get('month') + '-' + get('day'), hour: Number(get('hour')), minute: Number(get('minute')) };
+}
+
+// 'YYYY-MM-DD' 날짜의 다음 날 (한국 시간)
+function nextDay(date) {
+  const next = new Date(Date.parse(date + 'T00:00:00+09:00') + 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: SEOUL }).format(next);
 }
 
 // 상영 시각. 상영시간을 안 골랐으면 그날이 끝나는 시각(23:59)으로 본다. 상영일이 없는 옛 글은 null
 function showMoment(item) {
   if (!item.showDate) return null;
-  return new Date(item.showDate + 'T' + (item.showTime || '23:59') + ':00');
+  return new Date(item.showDate + 'T' + (item.showTime || '23:59') + ':00+09:00');
 }
 
-// 상영일을 오늘·내일·11/7처럼 보여 준다
+// 상영일을 오늘·내일·11/7처럼 보여 준다 (한국 시간 기준)
 function dayLabel(showDate) {
-  const now = new Date();
-  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  if (showDate === dateText(now)) return '오늘';
-  if (showDate === dateText(tomorrow)) return '내일';
+  const today = seoulNow().date;
+  if (showDate === today) return '오늘';
+  if (showDate === nextDay(today)) return '내일';
   const [, month, day] = showDate.split('-');
   return Number(month) + '/' + Number(day);
 }
@@ -460,9 +471,37 @@ function showForm() {
   document.querySelector('#add-form').hidden = !(session && formOpen);
 }
 
-// 상영시간 칸이 비어 있을 때만 '상영시간' 안내 글을 보여 준다
-function updateTimeHint() {
-  document.querySelector('.time-field').classList.toggle('filled', document.querySelector('#show-time').value !== '');
+// 상영시간 두 칸: 시(맨 위 '상영시간'은 시간 없음, 0~23)와 분(00~59). 24시간제라 오전·오후가 없다
+function buildTimeSelects() {
+  const hour = document.querySelector('#show-hour');
+  const minute = document.querySelector('#show-minute');
+  hour.append(new Option('상영시간', ''));
+  for (let h = 0; h < 24; h++) hour.append(new Option(h + '시', String(h)));
+  for (let m = 0; m < 60; m++) minute.append(new Option(String(m).padStart(2, '0') + '분', String(m).padStart(2, '0')));
+}
+
+// 고른 상영시간을 '19:50' 모양으로. 시 칸이 비어 있으면 빈 글(시간 없음)
+function showTimeValue() {
+  const hour = document.querySelector('#show-hour').value;
+  return hour === '' ? '' : hour.padStart(2, '0') + ':' + document.querySelector('#show-minute').value;
+}
+
+let dateTouched = false;  // 상영일 칸을 사용자가 직접 골랐는지
+let timeTouched = false;  // 상영시간 칸을 사용자가 직접 골랐는지
+
+// 상영일·상영시간 칸의 기본값을 지금 한국 시간으로 맞춘다 (직접 고른 값은 지킨다)
+function fillShowDefaults() {
+  const now = seoulNow();
+  const dateInput = document.querySelector('#show-date');
+  dateInput.min = now.date;  // 지난 날은 고를 수 없다
+  if (!dateTouched || dateInput.value < now.date) {
+    dateInput.value = now.date;
+    dateTouched = false;
+  }
+  if (!timeTouched) {
+    document.querySelector('#show-hour').value = String(now.hour);
+    document.querySelector('#show-minute').value = String(now.minute).padStart(2, '0');
+  }
 }
 
 // 로그인 상태에 따라 화면을 바꾼다 (로그인 칸 / 내 이메일·로그아웃 / 넘기기 버튼)
@@ -530,10 +569,12 @@ document.querySelector('#signup').addEventListener('click', signUp);
 document.querySelector('#logout').addEventListener('click', logOut);
 document.querySelector('#open-form').addEventListener('click', () => {
   formOpen = !formOpen;
+  fillShowDefaults();
   showForm();
 });
-document.querySelector('#show-time').addEventListener('input', updateTimeHint);
-document.querySelector('#show-time').addEventListener('change', updateTimeHint);
+document.querySelector('#show-date').addEventListener('change', () => { dateTouched = true; });
+document.querySelector('#show-hour').addEventListener('change', () => { timeTouched = true; });
+document.querySelector('#show-minute').addEventListener('change', () => { timeTouched = true; });
 document.querySelector('#password').addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !event.isComposing) logIn();
 });
@@ -557,7 +598,7 @@ button.addEventListener('click', () => {
   const movie = document.querySelector('#movie');
   const price = document.querySelector('#price');
   const showDate = document.querySelector('#show-date');
-  const showTime = document.querySelector('#show-time');
+  const showTime = { value: showTimeValue() };  // '19:50' 또는 빈 글(시간 없음)
   const recliner = document.querySelector('#recliner');
   const link = document.querySelector('#link');
   const phone = document.querySelector('#phone');
@@ -576,7 +617,7 @@ button.addEventListener('click', () => {
     alert('상영일을 골라 주세요.');
     return;
   }
-  if (new Date(showDate.value + 'T' + (showTime.value || '23:59') + ':00') < new Date()) {
+  if (showMoment({ showDate: showDate.value, showTime: showTime.value }) < new Date()) {
     alert('이미 지난 상영은 올릴 수 없어요.');
     return;
   }
@@ -597,9 +638,9 @@ button.addEventListener('click', () => {
   addItem(title, document.querySelector('#theater').value, won, recliner.checked, address, number, showDate.value, showTime.value);
   movie.value = '';
   price.value = '';
-  showDate.value = '';
-  showTime.value = '';
-  updateTimeHint();
+  dateTouched = false;  // 추가하면 상영일·상영시간은 다시 지금 한국 시간으로
+  timeTouched = false;
+  fillShowDefaults();
   formOpen = false;  // 추가하면 등록 사항은 다시 접는다
   showForm();
   recliner.checked = false;
@@ -613,7 +654,13 @@ document.querySelector('#movie').addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !event.isComposing) button.click();
 });
 
+buildTimeSelects();
+fillShowDefaults();
 applyTheme();
 applyAuth();
 loadItems();
-setInterval(render, 60 * 1000);  // 1분마다 다시 그려서 상영이 지난 글을 숨긴다
+// 1분마다: 날이 바뀌면 오늘 기본값을 새로 맞추고, 다시 그려서 상영이 지난 글을 숨기고 오늘·내일 글자를 고친다
+setInterval(() => {
+  fillShowDefaults();
+  render();
+}, 60 * 1000);

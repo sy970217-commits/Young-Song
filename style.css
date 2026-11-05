@@ -26,7 +26,8 @@ body {
 
 #theater,
 #show-date,
-#show-time {
+#show-hour,
+#show-minute {
   width: 100%;
   box-sizing: border-box;
   padding: 12px;
@@ -111,7 +112,8 @@ body.dark #link,
 body.dark #phone,
 body.dark #theater,
 body.dark #show-date,
-body.dark #show-time {
+body.dark #show-hour,
+body.dark #show-minute {
   color: #e5e7eb;
   background: #12181d;
   border-color: #1f4a46;
@@ -273,36 +275,17 @@ body.dark #open-form {
   background: #14b8a6;
 }
 
-/* 상영시간 칸이 비어 있을 때 보이는 안내 글 (칸을 누르거나 시간을 고르면 사라진다) */
-.time-field {
-  position: relative;
+/* 상영시간: 시와 분을 나란히 고른다 (24시간제) */
+.time-select {
+  display: flex;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
-.time-field #show-time { margin-bottom: 0; }
-
-.time-hint {
-  position: absolute;
-  top: 1px;
-  right: 48px;
-  bottom: 1px;
-  left: 1px;
-  display: flex;
-  align-items: center;
-  padding-left: 11px;
-  font-size: 16px;
-  color: #757575;
-  background: #ffffff;
-  border-radius: 7px 0 0 7px;
-  pointer-events: none;
-}
-
-.time-field.filled .time-hint,
-.time-field:focus-within .time-hint { display: none; }
-
-body.dark .time-hint {
-  color: #9ca3af;
-  background: #12181d;
+.time-select select {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 /* 판매 상태: 판매 중·예약 중·판매 완료 */
