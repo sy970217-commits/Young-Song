@@ -19,16 +19,19 @@ function readSession() {
   }
 }
 
-// Supabase가 돌려주는 '821012345678'을 '010-1234-5678'로 보여 준다
-function displayPhone(phone) {
-  const local = '0' + String(phone || '').replace(/^\+?82/, '');
-  return local.replace(/^(\d{3})(\d{3,4})(\d{4})$/, '$1-$2-$3');
+const PASSWORD_MIN = 8;  // 비밀번호는 8자 이상
+
+// 아이디(숫자 11자리)를 Supabase가 받는 '+82…' 번호 모양으로 바꾼다. 아이디 모양이 아니면 null
+// 0으로 시작하면 0을 빼고(01012345678 → +821012345678), 아니면 그대로 붙인다 (12345678901 → +8212345678901)
+function idToPhone(id) {
+  if (!/^[0-9]{11}$/.test(id)) return null;
+  return '+82' + (id.startsWith('0') ? id.slice(1) : id);
 }
 
-// 로그인 칸에 적은 휴대폰 번호(010-1234-5678)를 Supabase가 받는 '+821012345678'로 바꾼다. 휴대폰 번호가 아니면 null
-function loginPhone(text) {
-  const digits = text.replace(/[\s-]/g, '');
-  return /^01[0-9][0-9]{7,8}$/.test(digits) ? '+82' + digits.slice(1) : null;
+// Supabase가 돌려주는 '821012345678'을 아이디 '01012345678'로 되돌린다
+function phoneToId(phone) {
+  const rest = String(phone || '').replace(/^\+?82/, '');
+  return rest.length === 10 ? '0' + rest : rest;
 }
 
 function saveSession(data) {
@@ -37,7 +40,7 @@ function saveSession(data) {
     refresh_token: data.refresh_token,
     expires_at: Date.now() + (data.expires_in || 3600) * 1000,
     user_id: data.user.id,
-    name: data.user.email || displayPhone(data.user.phone),
+    name: data.user.email || phoneToId(data.user.phone),
   };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
@@ -71,11 +74,11 @@ function authErrorMessage(action, error) {
   if (!error.status) hint = '인터넷에 연결되지 않았거나 Supabase에 닿지 않아요.';
   else if (code === 'phone_provider_disabled' || code === 'signup_disabled') hint = 'Supabase에서 전화번호 가입이 꺼져 있어요. Authentication → Sign In / Providers → Phone을 켜 주세요.';
   else if (code === 'sms_send_failed' || code === 'over_sms_send_rate_limit' || error.status === 429) hint = '문자를 보내지 못했어요. Supabase의 Phone 설정에서 Confirm phone(문자 인증)을 꺼 주세요.';
-  else if (code === 'user_already_exists' || code === 'phone_exists') hint = '이미 가입한 전화번호예요. 로그인해 주세요.';
+  else if (code === 'user_already_exists' || code === 'phone_exists') hint = '이미 가입한 아이디예요. 로그인해 주세요.';
   else if (code === 'weak_password') hint = '비밀번호가 너무 약해요. 더 길고 복잡하게 바꿔 보세요.';
-  else if (code === 'validation_failed') hint = '전화번호나 비밀번호 모양이 올바르지 않아요.';
-  else if (code === 'invalid_credentials') hint = '전화번호나 비밀번호가 틀렸어요. 가입하지 않았다면 먼저 가입해 주세요.';
-  else if (code === 'phone_not_confirmed') hint = '문자 인증이 안 된 번호예요. Supabase의 Phone 설정에서 Confirm phone을 꺼 주세요.';
+  else if (code === 'validation_failed') hint = '아이디나 비밀번호 모양이 올바르지 않아요.';
+  else if (code === 'invalid_credentials') hint = '아이디나 비밀번호가 틀렸어요. 가입하지 않았다면 먼저 가입해 주세요.';
+  else if (code === 'phone_not_confirmed') hint = '문자 인증이 안 된 아이디예요. Supabase의 Phone 설정에서 Confirm phone을 꺼 주세요.';
   else hint = '이유를 알 수 없어요.';
   const server = error.status ? '\n(Supabase 답: ' + error.status + ' ' + code + ' ' + error.detail + ')' : '';
   return action + '하지 못했어요. ' + hint + server;
@@ -532,13 +535,13 @@ function applyAuth() {
 }
 
 function authFields() {
-  return { phone: loginPhone(document.querySelector('#login-phone').value), password: document.querySelector('#password').value };
+  return { phone: idToPhone(document.querySelector('#login-id').value.trim()), password: document.querySelector('#password').value };
 }
 
 async function logIn() {
   const { phone, password } = authFields();
   if (!phone || password === '') {
-    alert('휴대폰 번호(예: 010-1234-5678)와 비밀번호를 적어 주세요.');
+    alert('아이디(숫자 11자리)와 비밀번호를 적어 주세요.');
     return;
   }
   try {
@@ -554,8 +557,12 @@ async function logIn() {
 
 async function signUp() {
   const { phone, password } = authFields();
-  if (!phone || password.length < 6) {
-    alert('휴대폰 번호(예: 010-1234-5678)를 적고, 비밀번호는 6자 이상으로 적어 주세요.');
+  if (!phone) {
+    alert('아이디는 숫자 11자리로 적어 주세요. (예: 01012345678)');
+    return;
+  }
+  if (password.length < PASSWORD_MIN) {
+    alert('비밀번호는 ' + PASSWORD_MIN + '자 이상으로 적어 주세요.');
     return;
   }
   try {
