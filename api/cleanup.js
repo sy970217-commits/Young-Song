@@ -1,7 +1,7 @@
 // 하루가 지난 양도권을 지운다. Vercel이 매일 새벽에 이 주소(/api/cleanup)를 불러 준다 (vercel.json 참고)
 // 비밀 키는 파일에 적지 않고 Vercel 환경 변수에서만 읽는다:
-//   SUPABASE_SERVICE_ROLE_KEY  Supabase의 service role 비밀 키
-//   CRON_SECRET                자동 실행 암호 (Vercel이 요청에 "Bearer 암호"로 붙여 준다)
+//   SUPABASE_SECRET_KEY  Supabase의 비밀 키 (sb_secret_...). 옛 이름 SUPABASE_SERVICE_ROLE_KEY도 읽는다
+//   CRON_SECRET          자동 실행 암호 (Vercel이 요청에 "Bearer 암호"로 붙여 준다)
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sijsxqhlaxtlmxdkmhuk.supabase.co';
 const IMAGE_BUCKET = 'images';
@@ -18,9 +18,9 @@ function imageKey(imageUrl) {
 
 module.exports = async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!secret || !serviceKey) {
-    res.status(503).json({ error: 'CRON_SECRET과 SUPABASE_SERVICE_ROLE_KEY를 Vercel 환경 변수에 넣어 주세요.' });
+    res.status(503).json({ error: 'CRON_SECRET과 SUPABASE_SECRET_KEY를 Vercel 환경 변수에 넣어 주세요.' });
     return;
   }
   if (req.headers.authorization !== 'Bearer ' + secret) {
@@ -28,7 +28,9 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const headers = { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey, 'Content-Type': 'application/json' };
+  // 새 비밀 키(sb_secret_...)는 apikey 머리말로만 보내고, 옛 JWT 모양 키는 Authorization에도 붙인다
+  const headers = { apikey: serviceKey, 'Content-Type': 'application/json' };
+  if (!serviceKey.startsWith('sb_')) headers.Authorization = 'Bearer ' + serviceKey;
   const today = seoulToday();
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
