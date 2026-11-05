@@ -19,13 +19,25 @@ function readSession() {
   }
 }
 
+// Supabase가 돌려주는 '821012345678'을 '010-1234-5678'로 보여 준다
+function displayPhone(phone) {
+  const local = '0' + String(phone || '').replace(/^\+?82/, '');
+  return local.replace(/^(\d{3})(\d{3,4})(\d{4})$/, '$1-$2-$3');
+}
+
+// 로그인 칸에 적은 휴대폰 번호(010-1234-5678)를 Supabase가 받는 '+821012345678'로 바꾼다. 휴대폰 번호가 아니면 null
+function loginPhone(text) {
+  const digits = text.replace(/[\s-]/g, '');
+  return /^01[0-9][0-9]{7,8}$/.test(digits) ? '+82' + digits.slice(1) : null;
+}
+
 function saveSession(data) {
   session = {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: Date.now() + (data.expires_in || 3600) * 1000,
     user_id: data.user.id,
-    email: data.user.email,
+    name: data.user.email || displayPhone(data.user.phone),
   };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
@@ -57,13 +69,13 @@ function authErrorMessage(action, error) {
   const code = error.code;
   let hint;
   if (!error.status) hint = '인터넷에 연결되지 않았거나 Supabase에 닿지 않아요.';
-  else if (code === 'email_provider_disabled' || code === 'signup_disabled') hint = 'Supabase에서 이메일 가입이 꺼져 있어요. Authentication → Sign In / Providers → Email를 켜 주세요.';
-  else if (code === 'over_email_send_rate_limit' || error.status === 429) hint = '메일을 너무 많이 보내서 잠시 막혔어요. 잠시 뒤에 다시 하거나, Supabase에서 Confirm email을 꺼 주세요.';
-  else if (code === 'user_already_exists') hint = '이미 가입한 이메일이에요. 로그인해 주세요.';
+  else if (code === 'phone_provider_disabled' || code === 'signup_disabled') hint = 'Supabase에서 전화번호 가입이 꺼져 있어요. Authentication → Sign In / Providers → Phone을 켜 주세요.';
+  else if (code === 'sms_send_failed' || code === 'over_sms_send_rate_limit' || error.status === 429) hint = '문자를 보내지 못했어요. Supabase의 Phone 설정에서 Confirm phone(문자 인증)을 꺼 주세요.';
+  else if (code === 'user_already_exists' || code === 'phone_exists') hint = '이미 가입한 전화번호예요. 로그인해 주세요.';
   else if (code === 'weak_password') hint = '비밀번호가 너무 약해요. 더 길고 복잡하게 바꿔 보세요.';
-  else if (code === 'email_address_invalid' || code === 'validation_failed') hint = '이메일 주소가 올바르지 않아요.';
-  else if (code === 'invalid_credentials') hint = '이메일이나 비밀번호가 틀렸어요. 가입하지 않았다면 먼저 가입해 주세요.';
-  else if (code === 'email_not_confirmed') hint = '메일 인증이 안 됐어요. 받은 메일의 링크를 누른 뒤 로그인해 주세요.';
+  else if (code === 'validation_failed') hint = '전화번호나 비밀번호 모양이 올바르지 않아요.';
+  else if (code === 'invalid_credentials') hint = '전화번호나 비밀번호가 틀렸어요. 가입하지 않았다면 먼저 가입해 주세요.';
+  else if (code === 'phone_not_confirmed') hint = '문자 인증이 안 된 번호예요. Supabase의 Phone 설정에서 Confirm phone을 꺼 주세요.';
   else hint = '이유를 알 수 없어요.';
   const server = error.status ? '\n(Supabase 답: ' + error.status + ' ' + code + ' ' + error.detail + ')' : '';
   return action + '하지 못했어요. ' + hint + server;
@@ -515,22 +527,22 @@ function applyAuth() {
   document.querySelector('#auth-in').hidden = !session;
   if (!session) formOpen = false;
   showForm();
-  document.querySelector('#who').textContent = session ? session.email : '';
+  document.querySelector('#who').textContent = session ? (session.name || session.email) : '';
   render();
 }
 
 function authFields() {
-  return { email: document.querySelector('#email').value.trim(), password: document.querySelector('#password').value };
+  return { phone: loginPhone(document.querySelector('#login-phone').value), password: document.querySelector('#password').value };
 }
 
 async function logIn() {
-  const { email, password } = authFields();
-  if (email === '' || password === '') {
-    alert('이메일과 비밀번호를 적어 주세요.');
+  const { phone, password } = authFields();
+  if (!phone || password === '') {
+    alert('휴대폰 번호(예: 010-1234-5678)와 비밀번호를 적어 주세요.');
     return;
   }
   try {
-    saveSession(await authRequest('/token?grant_type=password', { email: email, password: password }));
+    saveSession(await authRequest('/token?grant_type=password', { phone: phone, password: password }));
   } catch (error) {
     alert(authErrorMessage('로그인', error));
     return;
@@ -541,20 +553,20 @@ async function logIn() {
 }
 
 async function signUp() {
-  const { email, password } = authFields();
-  if (email === '' || password.length < 6) {
-    alert('이메일을 적고, 비밀번호는 6자 이상으로 적어 주세요.');
+  const { phone, password } = authFields();
+  if (!phone || password.length < 6) {
+    alert('휴대폰 번호(예: 010-1234-5678)를 적고, 비밀번호는 6자 이상으로 적어 주세요.');
     return;
   }
   try {
-    const data = await authRequest('/signup', { email: email, password: password });
+    const data = await authRequest('/signup', { phone: phone, password: password });
     if (data && data.access_token) {
-      saveSession(data);  // 메일 인증이 꺼져 있으면 가입과 함께 로그인된다
+      saveSession(data);  // 문자 인증이 꺼져 있으면 가입과 함께 로그인된다
       document.querySelector('#password').value = '';
       applyAuth();
       await loadItems();
     } else {
-      alert('가입했어요. 메일로 인증 링크를 보냈으면 링크를 누른 뒤 로그인해 주세요.');
+      alert('가입했어요. 문자 인증이 켜져 있으면 받은 인증을 마친 뒤 로그인해 주세요. (Supabase의 Phone 설정에서 Confirm phone을 끄면 바로 로그인돼요)');
     }
   } catch (error) {
     alert(authErrorMessage('가입', error));
