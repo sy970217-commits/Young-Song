@@ -301,6 +301,11 @@ function showMoment(item) {
   return new Date(item.showDate + 'T' + (item.showTime || '23:59') + ':00+09:00');
 }
 
+// 지금 시각을 '분' 단위로 내린 값. 상영 시작 분이 되기 전까지는 지나지 않은 것으로 본다 (기본값이 지금 시각이라서)
+function nowMinute() {
+  return new Date(Math.floor(Date.now() / 60000) * 60000);
+}
+
 // 상영일을 오늘·내일·11/7처럼 보여 준다 (한국 시간 기준)
 function dayLabel(showDate) {
   const today = seoulNow().date;
@@ -328,7 +333,7 @@ function render() {
   const list = document.querySelector('#list');
   list.innerHTML = '';
   // 상영이 지난 글은 숨기고, 상영이 가까운 순으로 정렬한다 (판매 완료는 맨 아래, 같으면 추가한 순서)
-  const now = new Date();
+  const now = nowMinute();
   const shown = items.filter((item) => {
     const moment = showMoment(item);
     return !moment || moment >= now;
@@ -572,6 +577,14 @@ document.querySelector('#open-form').addEventListener('click', () => {
   fillShowDefaults();
   showForm();
 });
+// 판매링크·전화번호 중 고른 쪽의 입력 칸만 보인다
+document.querySelectorAll('input[name="contact"]').forEach((radio) => {
+  radio.addEventListener('change', () => {
+    const useLink = document.querySelector('input[name="contact"]:checked').value === 'link';
+    document.querySelector('#link').hidden = !useLink;
+    document.querySelector('#phone').hidden = useLink;
+  });
+});
 document.querySelector('#show-date').addEventListener('change', () => { dateTouched = true; });
 document.querySelector('#show-hour').addEventListener('change', () => { timeTouched = true; });
 document.querySelector('#show-minute').addEventListener('change', () => { timeTouched = true; });
@@ -617,21 +630,27 @@ button.addEventListener('click', () => {
     alert('상영일을 골라 주세요.');
     return;
   }
-  if (showMoment({ showDate: showDate.value, showTime: showTime.value }) < new Date()) {
+  if (showMoment({ showDate: showDate.value, showTime: showTime.value }) < nowMinute()) {
     alert('이미 지난 상영은 올릴 수 없어요.');
     return;
   }
-  const address = link.value.trim();
-  const number = phone.value.trim();
-  if (address === '' && number === '') {                       // 당근 링크나 전화번호 중 하나는 꼭 있어야 한다
-    alert('당근 링크나 전화번호 중 하나는 꼭 적어 주세요.');
+  // 판매링크와 전화번호 중 고른 쪽만 적는다 (안 고른 쪽은 비운다)
+  const useLink = document.querySelector('input[name="contact"]:checked').value === 'link';
+  const address = useLink ? link.value.trim() : '';
+  const number = useLink ? '' : phone.value.trim();
+  if (useLink && address === '') {
+    alert('판매링크를 적어 주세요.');
     return;
   }
-  if (address !== '' && !isDaangnLink(address)) {
+  if (!useLink && number === '') {
+    alert('전화번호를 적어 주세요.');
+    return;
+  }
+  if (useLink && !isDaangnLink(address)) {
     alert('당근 링크만 넣을 수 있어요. http:// 또는 https://로 시작하고 daangn이 들어간 주소를 적어 주세요.');
     return;
   }
-  if (number !== '' && !isPhoneNumber(number)) {
+  if (!useLink && !isPhoneNumber(number)) {
     alert('전화번호는 숫자와 -만, 숫자 9~11자리로 적어 주세요. (예: 010-1234-5678)');
     return;
   }
